@@ -26,8 +26,8 @@ interface AppSidebarProps {
 
 export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSidebarProps) {
   const [filters, setFilters] = useState({
-    branch: 'all',
-    lowPerformance: false,
+    branch_name: 'all',
+    low_performance_flag: false,
     searchTerm: ''
   });
 
@@ -47,7 +47,7 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSide
     <Sidebar className="w-80">
       <SidebarHeader className="p-4">
         <h2 className="text-lg font-semibold">Lawyer Performance AI</h2>
-        <p className="text-sm text-muted-foreground">Predict & Allocate</p>
+        <p className="text-sm text-muted-foreground">Performance Analytics</p>
       </SidebarHeader>
 
       <SidebarContent>
@@ -80,7 +80,7 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSide
               <Label htmlFor="search">Search Lawyers</Label>
               <Input
                 id="search"
-                placeholder="Name or branch..."
+                placeholder="Lawyer ID or branch..."
                 value={filters.searchTerm}
                 onChange={(e) => handleFilterUpdate('searchTerm', e.target.value)}
               />
@@ -89,8 +89,8 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSide
             <div>
               <Label htmlFor="branch">Branch</Label>
               <Select 
-                value={filters.branch} 
-                onValueChange={(value) => handleFilterUpdate('branch', value)}
+                value={filters.branch_name} 
+                onValueChange={(value) => handleFilterUpdate('branch_name', value)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select branch" />
@@ -109,8 +109,8 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSide
             <div className="flex items-center space-x-2">
               <Checkbox
                 id="lowPerf"
-                checked={filters.lowPerformance}
-                onCheckedChange={(checked) => handleFilterUpdate('lowPerformance', checked)}
+                checked={filters.low_performance_flag}
+                onCheckedChange={(checked) => handleFilterUpdate('low_performance_flag', checked)}
               />
               <Label htmlFor="lowPerf">Show Low Performance Only</Label>
             </div>

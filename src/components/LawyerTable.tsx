@@ -13,7 +13,7 @@ interface LawyerTableProps {
 }
 
 export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
-  const [sortField, setSortField] = useState<keyof Lawyer>('predictedScore');
+  const [sortField, setSortField] = useState<keyof Lawyer>('lawyer_score');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
   const [localSearch, setLocalSearch] = useState('');
 
@@ -28,8 +28,8 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
 
   const filteredAndSorted = lawyers
     .filter(lawyer => 
-      lawyer.name.toLowerCase().includes(localSearch.toLowerCase()) ||
-      lawyer.branch.toLowerCase().includes(localSearch.toLowerCase())
+      lawyer.lawyer_id.toLowerCase().includes(localSearch.toLowerCase()) ||
+      lawyer.branch_name.toLowerCase().includes(localSearch.toLowerCase())
     )
     .sort((a, b) => {
       const aVal = a[sortField];
@@ -53,7 +53,7 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
         </div>
         <div className="w-72">
           <Input
-            placeholder="Search lawyers..."
+            placeholder="Search lawyers by ID or branch..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
           />
@@ -71,63 +71,69 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
                 <TableRow>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('name')}
+                    onClick={() => handleSort('lawyer_id')}
                   >
-                    Name {sortField === 'name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Lawyer ID {sortField === 'lawyer_id' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('branch')}
+                    onClick={() => handleSort('branch_name')}
                   >
-                    Branch {sortField === 'branch' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Branch {sortField === 'branch_name' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('predictedScore')}
+                    onClick={() => handleSort('lawyer_score')}
                   >
-                    Predicted Score {sortField === 'predictedScore' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Lawyer Score {sortField === 'lawyer_score' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('successRate')}
+                    onClick={() => handleSort('completion_rate')}
                   >
-                    Success Rate {sortField === 'successRate' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Completion Rate {sortField === 'completion_rate' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </TableHead>
-                  <TableHead>Risk Level</TableHead>
+                  <TableHead>TAT Flag</TableHead>
+                  <TableHead>Performance Flag</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filteredAndSorted.map((lawyer) => (
-                  <TableRow key={lawyer.id} className="hover:bg-muted/50">
-                    <TableCell className="font-medium">{lawyer.name}</TableCell>
-                    <TableCell>{lawyer.branch}</TableCell>
+                  <TableRow 
+                    key={lawyer.lawyer_id} 
+                    className={`hover:bg-muted/50 ${lawyer.low_performance_flag ? 'bg-red-50 border-red-200' : ''}`}
+                  >
+                    <TableCell className="font-medium">{lawyer.lawyer_id}</TableCell>
+                    <TableCell>{lawyer.branch_name}</TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <span className="font-bold">
-                          {(lawyer.predictedScore * 100).toFixed(1)}%
+                          {(lawyer.lawyer_score * 100).toFixed(1)}%
                         </span>
                         <div className="w-20 bg-gray-200 rounded-full h-2">
                           <div 
                             className="bg-blue-600 h-2 rounded-full" 
-                            style={{ width: `${lawyer.predictedScore * 100}%` }}
+                            style={{ width: `${lawyer.lawyer_score * 100}%` }}
                           />
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{(lawyer.successRate * 100).toFixed(1)}%</TableCell>
+                    <TableCell>{(lawyer.completion_rate * 100).toFixed(1)}%</TableCell>
                     <TableCell>
-                      <Badge variant={
-                        lawyer.riskLevel === 'Low' ? 'default' : 
-                        lawyer.riskLevel === 'Medium' ? 'secondary' : 'destructive'
-                      }>
-                        {lawyer.riskLevel}
+                      <Badge variant={lawyer.tat_flag === 'Green' ? 'default' : 'destructive'}>
+                        {lawyer.tat_flag}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <Badge variant={lawyer.allocated ? 'outline' : 'default'}>
-                        {lawyer.allocated ? 'Allocated' : 'Available'}
+                      {lawyer.low_performance_flag && (
+                        <Badge variant="destructive">Low Performance</Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={lawyer.allocation_status === 'Allocated' ? 'outline' : 'default'}>
+                        {lawyer.allocation_status}
                       </Badge>
                     </TableCell>
                     <TableCell>

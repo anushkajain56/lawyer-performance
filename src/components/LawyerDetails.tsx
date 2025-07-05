@@ -14,19 +14,20 @@ interface LawyerDetailsProps {
 
 export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
   const featureImportance = [
-    { feature: 'Experience', value: lawyer.experience * 5, importance: 0.25 },
-    { feature: 'Success Rate', value: lawyer.successRate * 100, importance: 0.30 },
-    { feature: 'Case Value', value: lawyer.avgCaseValue / 1000, importance: 0.20 },
-    { feature: 'Client Satisfaction', value: lawyer.clientSatisfaction * 20, importance: 0.15 },
-    { feature: 'Certifications', value: lawyer.certifications * 10, importance: 0.10 },
+    { feature: 'Cases Completed', value: lawyer.cases_completed, importance: lawyer.completion_rate },
+    { feature: 'Performance Score', value: lawyer.performance_score * 100, importance: lawyer.performance_score },
+    { feature: 'TAT Compliance', value: lawyer.tat_compliance_percent * 100, importance: lawyer.tat_compliance_percent },
+    { feature: 'Client Feedback', value: lawyer.client_feedback_score * 20, importance: lawyer.client_feedback_score / 5 },
+    { feature: 'Quality Rating', value: lawyer.quality_rating * 20, importance: lawyer.quality_rating / 5 },
   ];
 
   const performanceMetrics = [
-    { label: 'Cases Completed', value: lawyer.casesCompleted, unit: '' },
-    { label: 'Success Rate', value: (lawyer.successRate * 100).toFixed(1), unit: '%' },
-    { label: 'Avg Case Value', value: `$${(lawyer.avgCaseValue / 1000).toFixed(0)}`, unit: 'K' },
-    { label: 'Client Satisfaction', value: lawyer.clientSatisfaction.toFixed(1), unit: '/5' },
-    { label: 'Hours Worked', value: lawyer.hoursWorked.toLocaleString(), unit: '' },
+    { label: 'Cases Assigned', value: lawyer.cases_assigned, unit: '' },
+    { label: 'Cases Completed', value: lawyer.cases_completed, unit: '' },
+    { label: 'Completion Rate', value: (lawyer.completion_rate * 100).toFixed(1), unit: '%' },
+    { label: 'Cases Remaining', value: lawyer.cases_remaining, unit: '' },
+    { label: 'Total Cases YTD', value: lawyer.total_cases_ytd, unit: '' },
+    { label: 'Avg TAT Days', value: lawyer.avg_tat_days.toFixed(1), unit: ' days' },
   ];
 
   return (
@@ -37,31 +38,34 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
           Back to Table
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">{lawyer.name}</h1>
-          <p className="text-muted-foreground">{lawyer.branch} Law • {lawyer.experience} years experience</p>
+          <h1 className="text-3xl font-bold">{lawyer.lawyer_id}</h1>
+          <p className="text-muted-foreground">{lawyer.branch_name} • Allocation Month: {lawyer.allocation_month}</p>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>AI Prediction Score</CardTitle>
+            <CardTitle>Lawyer Score</CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-4">
             <div className="text-4xl font-bold text-blue-600">
-              {(lawyer.predictedScore * 100).toFixed(1)}%
+              {(lawyer.lawyer_score * 100).toFixed(1)}%
             </div>
-            <Progress value={lawyer.predictedScore * 100} className="w-full" />
-            <div className="flex justify-center">
-              <Badge variant={
-                lawyer.riskLevel === 'Low' ? 'default' : 
-                lawyer.riskLevel === 'Medium' ? 'secondary' : 'destructive'
-              } className="text-sm">
-                {lawyer.riskLevel} Risk
+            <Progress value={lawyer.lawyer_score * 100} className="w-full" />
+            <div className="flex flex-col space-y-2">
+              <Badge variant={lawyer.tat_flag === 'Green' ? 'default' : 'destructive'}>
+                TAT: {lawyer.tat_flag}
               </Badge>
+              {lawyer.low_performance_flag && (
+                <Badge variant="destructive">Low Performance Flag</Badge>
+              )}
+              {lawyer.quality_check_flag && (
+                <Badge variant="default">Quality Check Passed</Badge>
+              )}
             </div>
             <div className="text-sm text-muted-foreground">
-              Status: {lawyer.allocated ? 'Currently Allocated' : 'Available for Assignment'}
+              Status: {lawyer.allocation_status}
             </div>
           </CardContent>
         </Card>
@@ -89,9 +93,9 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Feature Importance Analysis</CardTitle>
+          <CardTitle>Performance Breakdown</CardTitle>
           <p className="text-sm text-muted-foreground">
-            Factors contributing to the AI prediction score
+            Key metrics contributing to the lawyer score
           </p>
         </CardHeader>
         <CardContent>
@@ -103,11 +107,10 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
               <Tooltip 
                 formatter={(value, name) => [
                   name === 'importance' ? `${(value as number * 100).toFixed(1)}%` : value,
-                  name === 'importance' ? 'Importance' : 'Value'
+                  name === 'importance' ? 'Score' : 'Value'
                 ]}
               />
               <Bar dataKey="value" fill="#3b82f6" name="Current Value" />
-              <Bar dataKey="importance" fill="#10b981" name="Feature Weight" />
             </BarChart>
           </ResponsiveContainer>
         </CardContent>
@@ -116,24 +119,28 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         <Card>
           <CardHeader>
-            <CardTitle>Professional Summary</CardTitle>
+            <CardTitle>Quality & Risk Indicators</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Years of Experience:</span>
-              <span className="font-medium">{lawyer.experience} years</span>
+              <span className="text-muted-foreground">TAT Compliance:</span>
+              <span className="font-medium">{(lawyer.tat_compliance_percent * 100).toFixed(1)}%</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Specialization:</span>
-              <span className="font-medium">{lawyer.branch} Law</span>
+              <span className="text-muted-foreground">Client Feedback Score:</span>
+              <span className="font-medium">{lawyer.client_feedback_score.toFixed(1)}/5.0</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Certifications:</span>
-              <span className="font-medium">{lawyer.certifications}</span>
+              <span className="text-muted-foreground">Quality Rating:</span>
+              <span className="font-medium">{lawyer.quality_rating.toFixed(1)}/5.0</span>
             </div>
             <div className="flex justify-between">
-              <span className="text-muted-foreground">Last Updated:</span>
-              <span className="font-medium">{lawyer.lastUpdated}</span>
+              <span className="text-muted-foreground">Complaints per Case:</span>
+              <span className="font-medium">{lawyer.complaints_per_case.toFixed(3)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Reworks per Case:</span>
+              <span className="font-medium">{lawyer.reworks_per_case.toFixed(3)}</span>
             </div>
           </CardContent>
         </Card>
@@ -145,24 +152,24 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
           <CardContent className="space-y-4">
             <div>
               <div className="flex justify-between mb-2">
-                <span className="text-sm">Success Rate</span>
-                <span className="text-sm font-medium">{(lawyer.successRate * 100).toFixed(1)}%</span>
+                <span className="text-sm">Completion Rate</span>
+                <span className="text-sm font-medium">{(lawyer.completion_rate * 100).toFixed(1)}%</span>
               </div>
-              <Progress value={lawyer.successRate * 100} />
+              <Progress value={lawyer.completion_rate * 100} />
             </div>
             <div>
               <div className="flex justify-between mb-2">
-                <span className="text-sm">Client Satisfaction</span>
-                <span className="text-sm font-medium">{lawyer.clientSatisfaction}/5.0</span>
+                <span className="text-sm">Performance Score</span>
+                <span className="text-sm font-medium">{(lawyer.performance_score * 100).toFixed(1)}%</span>
               </div>
-              <Progress value={(lawyer.clientSatisfaction / 5) * 100} />
+              <Progress value={lawyer.performance_score * 100} />
             </div>
             <div>
               <div className="flex justify-between mb-2">
-                <span className="text-sm">Workload (Hours/Year)</span>
-                <span className="text-sm font-medium">{lawyer.hoursWorked.toLocaleString()}</span>
+                <span className="text-sm">TAT Compliance</span>
+                <span className="text-sm font-medium">{(lawyer.tat_compliance_percent * 100).toFixed(1)}%</span>
               </div>
-              <Progress value={(lawyer.hoursWorked / 2500) * 100} />
+              <Progress value={lawyer.tat_compliance_percent * 100} />
             </div>
           </CardContent>
         </Card>

@@ -27,18 +27,18 @@ export default function Dashboard() {
   const handleFilterChange = (filters: any) => {
     let filtered = lawyers;
     
-    if (filters.branch && filters.branch !== 'all') {
-      filtered = filtered.filter(lawyer => lawyer.branch === filters.branch);
+    if (filters.branch_name && filters.branch_name !== 'all') {
+      filtered = filtered.filter(lawyer => lawyer.branch_name === filters.branch_name);
     }
     
-    if (filters.lowPerformance) {
-      filtered = filtered.filter(lawyer => lawyer.predictedScore < 0.7);
+    if (filters.low_performance_flag) {
+      filtered = filtered.filter(lawyer => lawyer.low_performance_flag);
     }
     
     if (filters.searchTerm) {
       filtered = filtered.filter(lawyer => 
-        lawyer.name.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-        lawyer.branch.toLowerCase().includes(filters.searchTerm.toLowerCase())
+        lawyer.lawyer_id.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
+        lawyer.branch_name.toLowerCase().includes(filters.searchTerm.toLowerCase())
       );
     }
 

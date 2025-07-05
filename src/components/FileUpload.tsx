@@ -46,22 +46,30 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
       const previewData: Lawyer[] = lines.slice(1, 6).map((line, index) => {
         const values = line.split(',').map(v => v.trim());
         return {
-          id: `preview-${index}`,
-          name: values[0] || `Lawyer ${index + 1}`,
-          branch: values[1] || 'Corporate',
-          experience: parseInt(values[2]) || 5,
-          casesCompleted: parseInt(values[3]) || 100,
-          successRate: parseFloat(values[4]) || 0.8,
-          avgCaseValue: parseInt(values[5]) || 50000,
-          clientSatisfaction: parseFloat(values[6]) || 4.5,
-          certifications: parseInt(values[7]) || 2,
-          hoursWorked: parseInt(values[8]) || 2000,
-          predictedScore: Math.random() * 0.3 + 0.7, // Mock prediction
-          riskLevel: ['Low', 'Medium', 'High'][Math.floor(Math.random() * 3)] as 'Low' | 'Medium' | 'High',
-          allocated: Math.random() > 0.5,
-          lastUpdated: new Date().toISOString().split('T')[0]
+          lawyer_id: values[0] || `L${index + 1}`,
+          branch_name: values[1] || 'Corporate',
+          allocation_month: values[2] || '2024-01',
+          case_id: values[3] || `C${index + 1}`,
+          cases_assigned: parseInt(values[4]) || 30,
+          cases_completed: parseInt(values[5]) || 25,
+          completion_rate: parseFloat(values[6]) || 0.8,
+          cases_remaining: parseInt(values[7]) || 5,
+          performance_score: parseFloat(values[8]) || 0.75,
+          tat_compliance_percent: parseFloat(values[9]) || 0.8,
+          avg_tat_days: parseFloat(values[10]) || 15,
+          tat_flag: (values[11] as 'Red' | 'Green') || 'Green',
+          quality_check_flag: values[12] === 'true' || false,
+          client_feedback_score: parseFloat(values[13]) || 4.0,
+          feedback_flag: values[14] === 'true' || false,
+          complaints_per_case: parseFloat(values[15]) || 0.05,
+          reworks_per_case: parseFloat(values[16]) || 0.1,
+          low_performance_flag: values[17] === 'true' || false,
+          lawyer_score: Math.random() * 0.4 + 0.6, // Mock ML prediction
+          quality_rating: parseFloat(values[19]) || 4.0,
+          allocation_status: (values[20] as 'Allocated' | 'Available') || 'Available',
+          total_cases_ytd: parseInt(values[21]) || 100
         };
-      }).filter(lawyer => lawyer.name && lawyer.name !== '');
+      }).filter(lawyer => lawyer.lawyer_id && lawyer.lawyer_id !== '');
       
       setPreview(previewData);
     };
@@ -79,16 +87,16 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
       // In real implementation, this would call your backend API
       const processedLawyers: Lawyer[] = preview.map((lawyer, index) => ({
         ...lawyer,
-        id: `uploaded-${Date.now()}-${index}`,
-        predictedScore: Math.random() * 0.4 + 0.6, // Mock ML prediction
-        lastUpdated: new Date().toISOString().split('T')[0]
+        lawyer_id: lawyer.lawyer_id || `uploaded-${Date.now()}-${index}`,
+        lawyer_score: Math.random() * 0.4 + 0.6, // Mock ML prediction
+        allocation_month: new Date().toISOString().slice(0, 7)
       }));
 
       onFileUpload(processedLawyers);
       
       toast({
         title: "Upload successful",
-        description: `Processed ${processedLawyers.length} lawyer records with AI predictions.`,
+        description: `Processed ${processedLawyers.length} lawyer records with performance predictions.`,
       });
 
       setFile(null);
@@ -109,7 +117,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Upload Lawyer Data</h1>
-        <p className="text-muted-foreground">Upload a CSV file to get AI predictions for lawyer performance</p>
+        <p className="text-muted-foreground">Upload a CSV file to get performance predictions for lawyers</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -157,19 +165,14 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
           <CardContent>
             <div className="text-sm space-y-2">
               <p className="font-medium">Required columns:</p>
-              <ul className="list-disc pl-5 space-y-1">
-                <li>name - Lawyer's full name</li>
-                <li>branch - Legal specialization</li>
-                <li>experience - Years of experience</li>
-                <li>casesCompleted - Total cases handled</li>
-                <li>successRate - Success rate (0.0-1.0)</li>
-                <li>avgCaseValue - Average case value ($)</li>
-                <li>clientSatisfaction - Rating (1.0-5.0)</li>
-                <li>certifications - Number of certifications</li>
-                <li>hoursWorked - Annual hours worked</li>
+              <ul className="list-disc pl-5 space-y-1 text-xs">
+                <li><strong>Basic Info:</strong> lawyer_id, branch_name, allocation_month, case_id</li>
+                <li><strong>Performance:</strong> cases_assigned, cases_completed, completion_rate, cases_remaining, performance_score, tat_compliance_percent, avg_tat_days</li>
+                <li><strong>Quality:</strong> tat_flag (Red/Green), quality_check_flag (true/false), client_feedback_score, feedback_flag (true/false), complaints_per_case, reworks_per_case, low_performance_flag (true/false)</li>
+                <li><strong>Summary:</strong> quality_rating, allocation_status (Allocated/Available), total_cases_ytd</li>
               </ul>
               <p className="text-xs text-muted-foreground mt-4">
-                The AI model will automatically predict performance scores and risk levels based on these features.
+                The system will automatically calculate lawyer_score based on these features.
               </p>
             </div>
           </CardContent>
@@ -187,24 +190,24 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b">
-                    <th className="text-left p-2">Name</th>
+                    <th className="text-left p-2">Lawyer ID</th>
                     <th className="text-left p-2">Branch</th>
-                    <th className="text-left p-2">Experience</th>
-                    <th className="text-left p-2">Cases</th>
-                    <th className="text-left p-2">Success Rate</th>
-                    <th className="text-left p-2">Predicted Score</th>
+                    <th className="text-left p-2">Cases Assigned</th>
+                    <th className="text-left p-2">Cases Completed</th>
+                    <th className="text-left p-2">Completion Rate</th>
+                    <th className="text-left p-2">Lawyer Score</th>
                   </tr>
                 </thead>
                 <tbody>
                   {preview.map((lawyer) => (
-                    <tr key={lawyer.id} className="border-b">
-                      <td className="p-2 font-medium">{lawyer.name}</td>
-                      <td className="p-2">{lawyer.branch}</td>
-                      <td className="p-2">{lawyer.experience}</td>
-                      <td className="p-2">{lawyer.casesCompleted}</td>
-                      <td className="p-2">{(lawyer.successRate * 100).toFixed(1)}%</td>
+                    <tr key={lawyer.lawyer_id} className="border-b">
+                      <td className="p-2 font-medium">{lawyer.lawyer_id}</td>
+                      <td className="p-2">{lawyer.branch_name}</td>
+                      <td className="p-2">{lawyer.cases_assigned}</td>
+                      <td className="p-2">{lawyer.cases_completed}</td>
+                      <td className="p-2">{(lawyer.completion_rate * 100).toFixed(1)}%</td>
                       <td className="p-2 font-bold text-blue-600">
-                        {(lawyer.predictedScore * 100).toFixed(1)}%
+                        {(lawyer.lawyer_score * 100).toFixed(1)}%
                       </td>
                     </tr>
                   ))}
