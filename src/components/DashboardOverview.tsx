@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +24,7 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
     branch,
     count,
     avgScore: lawyers.filter(l => l.branch_name === branch)
-      .reduce((sum, l) => sum + lawyer.lawyer_score, 0) / count,
+      .reduce((sum, l) => sum + l.lawyer_score, 0) / count,
     avgCompletionRate: lawyers.filter(l => l.branch_name === branch)
       .reduce((sum, l) => sum + l.completion_rate, 0) / count
   }));
