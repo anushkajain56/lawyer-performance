@@ -75,8 +75,8 @@ export default function Dashboard() {
           activeView={activeView}
           onFilterChange={handleFilterChange}
         />
-        <SidebarInset className="flex-1 overflow-hidden">
-          <main className="p-6 w-full">
+        <SidebarInset className="flex-1">
+          <main className="p-6 h-full">
             {activeView === 'overview' && (
               <DashboardOverview lawyers={filteredLawyers} />
             )}

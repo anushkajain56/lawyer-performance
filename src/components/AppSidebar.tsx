@@ -49,7 +49,7 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSide
   ];
 
   return (
-    <Sidebar className="w-80 bg-background border-r">
+    <Sidebar>
       <SidebarHeader className="p-4 border-b">
         <h2 className="text-lg font-semibold">Lawyer Performance AI</h2>
         <p className="text-sm text-muted-foreground">Performance Analytics</p>
@@ -97,10 +97,10 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSide
                 value={filters.branch_name} 
                 onValueChange={(value) => handleFilterUpdate('branch_name', value)}
               >
-                <SelectTrigger className="bg-background">
+                <SelectTrigger>
                   <SelectValue placeholder="Select branch" />
                 </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
+                <SelectContent>
                   <SelectItem value="all">All Branches</SelectItem>
                   {branches.map((branch) => (
                     <SelectItem key={branch} value={branch}>
@@ -117,10 +117,10 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSide
                 value={filters.tat_flag} 
                 onValueChange={(value) => handleFilterUpdate('tat_flag', value)}
               >
-                <SelectTrigger className="bg-background">
+                <SelectTrigger>
                   <SelectValue placeholder="Select TAT status" />
                 </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
+                <SelectContent>
                   <SelectItem value="all">All TAT Status</SelectItem>
                   <SelectItem value="Green">Green</SelectItem>
                   <SelectItem value="Red">Red</SelectItem>
@@ -134,10 +134,10 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSide
                 value={filters.allocation_status} 
                 onValueChange={(value) => handleFilterUpdate('allocation_status', value)}
               >
-                <SelectTrigger className="bg-background">
+                <SelectTrigger>
                   <SelectValue placeholder="Select allocation status" />
                 </SelectTrigger>
-                <SelectContent className="bg-background border shadow-lg z-50">
+                <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value="Allocated">Allocated</SelectItem>
                   <SelectItem value="Available">Available</SelectItem>
