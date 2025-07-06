@@ -31,8 +31,30 @@ export default function Dashboard() {
       filtered = filtered.filter(lawyer => lawyer.branch_name === filters.branch_name);
     }
     
+    if (filters.tat_flag && filters.tat_flag !== 'all') {
+      filtered = filtered.filter(lawyer => lawyer.tat_flag === filters.tat_flag);
+    }
+    
+    if (filters.allocation_status && filters.allocation_status !== 'all') {
+      filtered = filtered.filter(lawyer => lawyer.allocation_status === filters.allocation_status);
+    }
+    
     if (filters.low_performance_flag) {
       filtered = filtered.filter(lawyer => lawyer.low_performance_flag);
+    }
+    
+    if (filters.lawyer_score_range) {
+      filtered = filtered.filter(lawyer => 
+        lawyer.lawyer_score >= filters.lawyer_score_range[0] && 
+        lawyer.lawyer_score <= filters.lawyer_score_range[1]
+      );
+    }
+    
+    if (filters.completion_rate_range) {
+      filtered = filtered.filter(lawyer => 
+        lawyer.completion_rate >= filters.completion_rate_range[0] && 
+        lawyer.completion_rate <= filters.completion_rate_range[1]
+      );
     }
     
     if (filters.searchTerm) {
@@ -53,8 +75,8 @@ export default function Dashboard() {
           activeView={activeView}
           onFilterChange={handleFilterChange}
         />
-        <SidebarInset className="flex-1">
-          <main className="p-6">
+        <SidebarInset className="flex-1 overflow-hidden">
+          <main className="p-6 w-full">
             {activeView === 'overview' && (
               <DashboardOverview lawyers={filteredLawyers} />
             )}
