@@ -17,6 +17,7 @@ serve(async (req) => {
 
   try {
     if (req.method !== 'POST') {
+      console.log('Invalid method:', req.method)
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }), 
         { 
@@ -26,30 +27,47 @@ serve(async (req) => {
       )
     }
 
-    console.log('Processing CSV file...')
+    console.log('Processing CSV file with Edge Function...')
 
-    // Parse form data to get the uploaded file
-    const formData = await req.formData()
-    const file = formData.get('file') as File
+    let file: File;
+    let csvContent: string;
 
-    if (!file) {
-      console.log('No file found in request')
+    try {
+      // Parse form data to get the uploaded file
+      const formData = await req.formData()
+      const uploadedFile = formData.get('file')
+      
+      if (!uploadedFile) {
+        console.log('No file found in form data')
+        return new Response(
+          JSON.stringify({ error: 'No file uploaded' }), 
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
+
+      file = uploadedFile as File
+      console.log('File received:', file.name, 'Size:', file.size, 'Type:', file.type)
+
+      // Read CSV content with error handling
+      csvContent = await file.text()
+      console.log('CSV content length:', csvContent.length)
+      
+    } catch (parseError) {
+      console.error('Error parsing form data or reading file:', parseError)
       return new Response(
-        JSON.stringify({ error: 'No file uploaded' }), 
+        JSON.stringify({ error: 'Failed to read uploaded file' }), 
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
     }
-
-    console.log('File received:', file.name, 'Size:', file.size, 'Type:', file.type)
-
-    // Read CSV content
-    const csvContent = await file.text()
-    console.log('CSV content length:', csvContent.length)
     
     if (!csvContent || csvContent.trim().length === 0) {
+      console.log('CSV content is empty')
       return new Response(
         JSON.stringify({ error: 'CSV file appears to be empty' }), 
         { 
@@ -59,27 +77,43 @@ serve(async (req) => {
       )
     }
 
-    // Parse CSV with better error handling
-    const lines = csvContent.trim().split('\n').filter(line => line.trim().length > 0)
-    
-    if (lines.length < 1) {
+    // Parse CSV with comprehensive error handling
+    let lines: string[]
+    let headers: string[]
+    let separator: string
+
+    try {
+      lines = csvContent.trim().split('\n').filter(line => line.trim().length > 0)
+      
+      if (lines.length < 1) {
+        return new Response(
+          JSON.stringify({ error: 'CSV file must have at least a header row' }), 
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
+      }
+
+      // Parse headers - handle both comma and semicolon separators
+      separator = ','
+      if (lines[0].includes(';') && !lines[0].includes(',')) {
+        separator = ';'
+      }
+      
+      headers = lines[0].split(separator).map(h => h.trim().replace(/["']/g, ''))
+      console.log('CSV headers:', headers, 'Separator:', separator, 'Total lines:', lines.length)
+      
+    } catch (headerError) {
+      console.error('Error parsing CSV headers:', headerError)
       return new Response(
-        JSON.stringify({ error: 'CSV file must have at least a header row' }), 
+        JSON.stringify({ error: 'Failed to parse CSV headers' }), 
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
     }
-
-    // Parse headers - handle both comma and semicolon separators
-    let separator = ','
-    if (lines[0].includes(';') && !lines[0].includes(',')) {
-      separator = ';'
-    }
-    
-    const headers = lines[0].split(separator).map(h => h.trim().replace(/"/g, ''))
-    console.log('CSV headers:', headers, 'Separator:', separator)
     
     const processedData = []
     
@@ -91,10 +125,13 @@ serve(async (req) => {
         processedData.push(sampleRow)
       }
     } else {
-      // Process actual data rows
+      // Process actual data rows with error handling for each row
+      let successfulRows = 0
+      let failedRows = 0
+      
       for (let i = 1; i < lines.length; i++) {
         try {
-          const values = lines[i].split(separator).map(v => v.trim().replace(/"/g, ''))
+          const values = lines[i].split(separator).map(v => v.trim().replace(/["']/g, ''))
           const row: any = {}
           
           // Map CSV values to row object
@@ -104,10 +141,24 @@ serve(async (req) => {
 
           const processedLawyer = processLawyerData(row, i)
           processedData.push(processedLawyer)
+          successfulRows++
         } catch (rowError) {
-          console.error(`Error processing row ${i}:`, rowError)
-          // Continue processing other rows
+          console.error(`Error processing row ${i}:`, rowError, 'Row data:', lines[i])
+          failedRows++
+          // Continue processing other rows instead of failing completely
         }
+      }
+      
+      console.log(`Processing complete: ${successfulRows} successful, ${failedRows} failed`)
+      
+      if (processedData.length === 0) {
+        return new Response(
+          JSON.stringify({ error: 'No valid data rows could be processed from the CSV file' }), 
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        )
       }
     }
 
@@ -124,11 +175,11 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Error processing CSV:', error)
+    console.error('Unexpected error in Edge Function:', error)
     return new Response(
       JSON.stringify({ 
-        error: 'Failed to process CSV file', 
-        details: error.message || 'Unknown error occurred'
+        error: 'Internal server error while processing CSV file', 
+        details: error instanceof Error ? error.message : 'Unknown error occurred'
       }),
       { 
         status: 500, 

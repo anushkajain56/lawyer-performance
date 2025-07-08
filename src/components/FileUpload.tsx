@@ -1,15 +1,16 @@
 
-import { useState, useCallback } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload, AlertCircle } from "lucide-react";
+import { Upload, AlertCircle, CheckCircle, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAddLawyers } from "@/hooks/useLawyers";
 import { Lawyer } from "@/types/lawyer";
 import { supabase } from "@/integrations/supabase/client";
+import { parseCSVContent } from "@/utils/csvProcessor";
 
 interface FileUploadProps {
   onFileUpload: (lawyers: Lawyer[]) => void;
@@ -20,6 +21,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
   const [preview, setPreview] = useState<Lawyer[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [processingMethod, setProcessingMethod] = useState<'edge-function' | 'client-side' | null>(null);
   const { toast } = useToast();
   const addLawyersMutation = useAddLawyers();
 
@@ -37,94 +39,81 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
       setFile(selectedFile);
       setPreview([]);
       setError(null);
+      setProcessingMethod(null);
     }
   };
 
-  const processFileWithBackend = async (file: File): Promise<Lawyer[]> => {
+  const processWithEdgeFunction = async (file: File): Promise<Lawyer[]> => {
     const formData = new FormData();
     formData.append('file', file);
 
+    console.log('Attempting Edge Function processing...');
+    
+    const { data, error } = await supabase.functions.invoke('preprocess-csv', {
+      body: formData,
+    });
+
+    if (error) {
+      console.error('Edge Function error:', error);
+      throw new Error(`Edge Function failed: ${error.message}`);
+    }
+
+    if (!data || !Array.isArray(data)) {
+      throw new Error('Invalid response from Edge Function');
+    }
+
+    return data.map((row: any, index: number) => ({
+      lawyer_id: row.lawyer_id || `L${Date.now()}-${index}`,
+      branch_name: row.branch_name || 'Corporate',
+      allocation_month: row.allocation_month || new Date().toISOString().slice(0, 7),
+      case_id: row.case_id || `C${Date.now()}-${index}`,
+      cases_assigned: parseInt(row.cases_assigned) || 30,
+      cases_completed: parseInt(row.cases_completed) || 25,
+      completion_rate: parseFloat(row.completion_rate) || 0.8,
+      cases_remaining: parseInt(row.cases_remaining) || 5,
+      performance_score: parseFloat(row.performance_score) || 0.75,
+      tat_compliance_percent: parseFloat(row.tat_compliance_percent) || 0.8,
+      avg_tat_days: parseFloat(row.avg_tat_days) || 15,
+      tat_flag: (row.tat_flag as 'Red' | 'Green') || 'Green',
+      quality_check_flag: row.quality_check_flag === true || row.quality_check_flag === 'true',
+      client_feedback_score: parseFloat(row.client_feedback_score) || 4.0,
+      feedback_flag: row.feedback_flag === true || row.feedback_flag === 'true',
+      complaints_per_case: parseFloat(row.complaints_per_case) || 0.05,
+      reworks_per_case: parseFloat(row.reworks_per_case) || 0.1,
+      low_performance_flag: row.low_performance_flag === true || row.low_performance_flag === 'true',
+      lawyer_score: parseFloat(row.lawyer_score) || Math.random() * 0.4 + 0.6,
+      quality_rating: parseFloat(row.quality_rating) || 4.0,
+      allocation_status: (row.allocation_status as 'Allocated' | 'Available') || 'Available',
+      total_cases_ytd: parseInt(row.total_cases_ytd) || 100
+    }));
+  };
+
+  const processWithClientSide = async (file: File): Promise<Lawyer[]> => {
+    console.log('Using client-side processing...');
+    const csvContent = await file.text();
+    const result = parseCSVContent(csvContent);
+    
+    if (!result.success || !result.data) {
+      throw new Error(result.error || 'Failed to process CSV on client-side');
+    }
+    
+    return result.data;
+  };
+
+  const processFile = async (file: File): Promise<{ data: Lawyer[], method: 'edge-function' | 'client-side' }> => {
+    // Try Edge Function first, then fallback to client-side processing
     try {
-      console.log('Sending file to Supabase Edge Function...', file.name, file.size);
+      const data = await processWithEdgeFunction(file);
+      return { data, method: 'edge-function' };
+    } catch (edgeError) {
+      console.warn('Edge Function failed, falling back to client-side processing:', edgeError);
       
-      const { data, error } = await supabase.functions.invoke('preprocess-csv', {
-        body: formData,
-      });
-
-      console.log('Edge Function response:', { data, error });
-
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw new Error(`Processing failed: ${error.message || 'Unknown error from Edge Function'}`);
-      }
-
-      if (!data) {
-        throw new Error('No data returned from processing service');
-      }
-
-      console.log('Processing successful, received:', Array.isArray(data) ? `${data.length} records` : typeof data);
-
-      // Handle case where data might be wrapped in another object
-      const processedData = Array.isArray(data) ? data : (data.data ? data.data : []);
-
-      if (!Array.isArray(processedData)) {
-        console.error('Invalid data structure:', processedData);
-        throw new Error('Invalid data structure returned from processing service');
-      }
-
-      if (processedData.length === 0) {
-        throw new Error('No records were processed from the CSV file');
-      }
-
-      // Transform backend response to match our Lawyer interface
-      const processedLawyers: Lawyer[] = processedData.map((row: any, index: number) => {
-        try {
-          return {
-            lawyer_id: row.lawyer_id || `L${Date.now()}-${index}`,
-            branch_name: row.branch_name || 'Corporate',
-            allocation_month: row.allocation_month || new Date().toISOString().slice(0, 7),
-            case_id: row.case_id || `C${Date.now()}-${index}`,
-            cases_assigned: parseInt(row.cases_assigned) || 30,
-            cases_completed: parseInt(row.cases_completed) || 25,
-            completion_rate: parseFloat(row.completion_rate) || 0.8,
-            cases_remaining: parseInt(row.cases_remaining) || 5,
-            performance_score: parseFloat(row.performance_score) || 0.75,
-            tat_compliance_percent: parseFloat(row.tat_compliance_percent) || 0.8,
-            avg_tat_days: parseFloat(row.avg_tat_days) || 15,
-            tat_flag: (row.tat_flag as 'Red' | 'Green') || 'Green',
-            quality_check_flag: row.quality_check_flag === true || row.quality_check_flag === 'true',
-            client_feedback_score: parseFloat(row.client_feedback_score) || 4.0,
-            feedback_flag: row.feedback_flag === true || row.feedback_flag === 'true',
-            complaints_per_case: parseFloat(row.complaints_per_case) || 0.05,
-            reworks_per_case: parseFloat(row.reworks_per_case) || 0.1,
-            low_performance_flag: row.low_performance_flag === true || row.low_performance_flag === 'true',
-            lawyer_score: parseFloat(row.lawyer_score) || Math.random() * 0.4 + 0.6,
-            quality_rating: parseFloat(row.quality_rating) || 4.0,
-            allocation_status: (row.allocation_status as 'Allocated' | 'Available') || 'Available',
-            total_cases_ytd: parseInt(row.total_cases_ytd) || 100
-          };
-        } catch (transformError) {
-          console.error(`Error transforming row ${index}:`, transformError, row);
-          throw new Error(`Error processing row ${index + 1} in CSV file`);
-        }
-      });
-
-      return processedLawyers;
-    } catch (error) {
-      console.error('Error processing file with Supabase Edge Function:', error);
-      
-      if (error instanceof Error) {
-        if (error.message.includes('Failed to fetch')) {
-          throw new Error('Unable to connect to the processing service. Please check your internet connection and try again.');
-        } else if (error.message.includes('Processing failed')) {
-          throw new Error(error.message);
-        } else if (error.message.includes('Invalid data structure')) {
-          throw new Error('The CSV file format is not recognized. Please check your file format.');
-        } else {
-          throw new Error(`Processing failed: ${error.message}`);
-        }
-      } else {
-        throw new Error('An unexpected error occurred while processing the file.');
+      try {
+        const data = await processWithClientSide(file);
+        return { data, method: 'client-side' };
+      } catch (clientError) {
+        console.error('Client-side processing also failed:', clientError);
+        throw new Error(`Processing failed: ${clientError instanceof Error ? clientError.message : 'Unknown error'}`);
       }
     }
   };
@@ -136,12 +125,13 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     setError(null);
     
     try {
-      const processedData = await processFileWithBackend(file);
-      setPreview(processedData.slice(0, 5));
+      const { data, method } = await processFile(file);
+      setPreview(data.slice(0, 5));
+      setProcessingMethod(method);
       
       toast({
         title: "File processed successfully",
-        description: `Preview showing first ${Math.min(5, processedData.length)} rows from ${processedData.length} total records.`,
+        description: `Preview showing first ${Math.min(5, data.length)} rows from ${data.length} total records. Processed using ${method === 'edge-function' ? 'Supabase Edge Function' : 'client-side processing'}.`,
       });
     } catch (error) {
       console.error('Preview error:', error);
@@ -164,17 +154,23 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     setError(null);
     
     try {
-      const processedLawyers = await processFileWithBackend(file);
+      const { data, method } = await processFile(file);
+      setProcessingMethod(method);
       
-      await addLawyersMutation.mutateAsync(processedLawyers);
+      await addLawyersMutation.mutateAsync(data);
       
-      onFileUpload(processedLawyers);
+      onFileUpload(data);
       
       setFile(null);
       setPreview([]);
       
       const fileInput = document.getElementById('csv-file') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
+      
+      toast({
+        title: "Upload successful",
+        description: `Successfully uploaded ${data.length} lawyer records using ${method === 'edge-function' ? 'Supabase Edge Function' : 'client-side processing'}.`,
+      });
       
     } catch (error) {
       console.error('Upload error:', error);
@@ -194,7 +190,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Upload Lawyer Data</h1>
-        <p className="text-muted-foreground">Upload a CSV file to process with Supabase Edge Function and store in the database</p>
+        <p className="text-muted-foreground">Upload a CSV file with robust processing and automatic fallback</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -221,6 +217,21 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
               <Alert>
                 <AlertDescription>
                   Selected file: {file.name} ({(file.size / 1024).toFixed(1)} KB)
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {processingMethod && (
+              <Alert>
+                {processingMethod === 'edge-function' ? (
+                  <CheckCircle className="h-4 w-4" />
+                ) : (
+                  <AlertTriangle className="h-4 w-4" />
+                )}
+                <AlertDescription>
+                  {processingMethod === 'edge-function' 
+                    ? 'Processed using Supabase Edge Function (server-side)' 
+                    : 'Processed using client-side fallback (Edge Function unavailable)'}
                 </AlertDescription>
               </Alert>
             )}
@@ -252,29 +263,29 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
             </div>
 
             <div className="text-xs text-muted-foreground">
-              <p>• Preview: Processes file with Supabase Edge Function and shows first 5 rows</p>
-              <p>• Upload: Processes file and saves all data to database</p>
-              <p>• Processing: Supabase Edge Function (serverless)</p>
+              <p>• <strong>Dual Processing:</strong> Edge Function with client-side fallback</p>
+              <p>• <strong>Robust:</strong> Handles various CSV formats and missing data</p>
+              <p>• <strong>Reliable:</strong> Always works regardless of backend status</p>
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Backend Integration</CardTitle>
+            <CardTitle>Processing Features</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-sm space-y-2">
-              <p className="font-medium">Supabase Edge Function Features:</p>
+              <p className="font-medium">Automatic Processing Features:</p>
               <ul className="list-disc pl-5 space-y-1 text-xs">
-                <li><strong>Feature Engineering:</strong> Calculates completion_rate, cases_remaining, complaints_per_case, reworks_per_case</li>
-                <li><strong>Data Validation:</strong> Handles missing data and generates realistic defaults</li>
-                <li><strong>Date Processing:</strong> Derives allocation_month from allocation_date</li>
-                <li><strong>Performance Flags:</strong> Computes low_performance_flag automatically</li>
-                <li><strong>Flexible CSV Support:</strong> Handles both comma and semicolon separated files</li>
+                <li><strong>Smart Fallback:</strong> Edge Function → Client-side if needed</li>
+                <li><strong>Feature Engineering:</strong> Auto-calculates performance metrics</li>
+                <li><strong>Data Validation:</strong> Handles missing/invalid data gracefully</li>
+                <li><strong>Flexible CSV:</strong> Supports comma/semicolon separators</li>
+                <li><strong>Sample Generation:</strong> Creates realistic data if only headers provided</li>
               </ul>
               <p className="text-xs text-muted-foreground mt-4">
-                The backend processes your raw CSV and returns fully transformed data ready for analysis.
+                The system automatically chooses the best processing method available and ensures your data is always processed successfully.
               </p>
             </div>
           </CardContent>
@@ -284,8 +295,11 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
       {preview.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Backend Processed Preview</CardTitle>
-            <p className="text-sm text-muted-foreground">First {preview.length} rows processed by Supabase Edge Function</p>
+            <CardTitle>Preview - Processed Data</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              First {preview.length} rows processed 
+              {processingMethod && ` using ${processingMethod === 'edge-function' ? 'Supabase Edge Function' : 'client-side processing'}`}
+            </p>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
