@@ -1,16 +1,14 @@
-
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Upload } from "lucide-react";
+import { Upload, AlertCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAddLawyers } from "@/hooks/useLawyers";
 import { Lawyer } from "@/types/lawyer";
 import { supabase } from "@/integrations/supabase/client";
-import axios from "axios";
 
 interface FileUploadProps {
   onFileUpload: (lawyers: Lawyer[]) => void;
@@ -20,6 +18,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Lawyer[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
   const addLawyersMutation = useAddLawyers();
 
@@ -35,8 +34,8 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
         return;
       }
       setFile(selectedFile);
-      // Clear previous preview when new file is selected
       setPreview([]);
+      setError(null);
     }
   };
 
@@ -46,25 +45,35 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
 
     try {
       console.log('Sending file to Supabase Edge Function...');
+      
       const { data, error } = await supabase.functions.invoke('preprocess-csv', {
         body: formData,
       });
 
       if (error) {
         console.error('Supabase function error:', error);
-        throw error;
+        throw new Error(`Edge Function error: ${error.message || 'Unknown error'}`);
       }
 
-      const response = { data };
+      if (!data) {
+        throw new Error('No data returned from Edge Function');
+      }
 
-      console.log('Backend response:', response.data);
+      console.log('Backend response received:', Array.isArray(data) ? `${data.length} records` : typeof data);
+
+      // Handle case where data might be wrapped in another object
+      const processedData = Array.isArray(data) ? data : (data.data ? data.data : []);
+
+      if (!Array.isArray(processedData) || processedData.length === 0) {
+        throw new Error('Invalid or empty data returned from processing');
+      }
 
       // Transform backend response to match our Lawyer interface
-      const processedLawyers: Lawyer[] = response.data.map((row: any) => ({
-        lawyer_id: row.lawyer_id || `L${Date.now()}-${Math.random()}`,
+      const processedLawyers: Lawyer[] = processedData.map((row: any, index: number) => ({
+        lawyer_id: row.lawyer_id || `L${Date.now()}-${index}`,
         branch_name: row.branch_name || 'Corporate',
         allocation_month: row.allocation_month || new Date().toISOString().slice(0, 7),
-        case_id: row.case_id || `C${Date.now()}-${Math.random()}`,
+        case_id: row.case_id || `C${Date.now()}-${index}`,
         cases_assigned: parseInt(row.cases_assigned) || 30,
         cases_completed: parseInt(row.cases_completed) || 25,
         completion_rate: parseFloat(row.completion_rate) || 0.8,
@@ -88,7 +97,18 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
       return processedLawyers;
     } catch (error) {
       console.error('Error processing file with Supabase Edge Function:', error);
-      throw new Error('Failed to process file with Supabase Edge Function. Please try again.');
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Failed to fetch')) {
+          throw new Error('Unable to connect to the processing service. Please check your internet connection and try again.');
+        } else if (error.message.includes('Edge Function')) {
+          throw new Error('Processing service error. Please try again in a moment.');
+        } else {
+          throw new Error(`Processing failed: ${error.message}`);
+        }
+      } else {
+        throw new Error('An unexpected error occurred while processing the file.');
+      }
     }
   };
 
@@ -96,9 +116,10 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     if (!file) return;
 
     setIsProcessing(true);
+    setError(null);
+    
     try {
       const processedData = await processFileWithBackend(file);
-      // Show first 5 rows for preview
       setPreview(processedData.slice(0, 5));
       
       toast({
@@ -107,9 +128,11 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
       });
     } catch (error) {
       console.error('Preview error:', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to process file for preview.";
+      setError(errorMessage);
       toast({
         title: "Preview failed",
-        description: error instanceof Error ? error.message : "Failed to process file for preview.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -121,29 +144,28 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     if (!file) return;
 
     setIsProcessing(true);
+    setError(null);
+    
     try {
-      // Process file with backend
       const processedLawyers = await processFileWithBackend(file);
       
-      // Upload processed data to Supabase
       await addLawyersMutation.mutateAsync(processedLawyers);
       
-      // Notify parent component
       onFileUpload(processedLawyers);
       
-      // Reset form
       setFile(null);
       setPreview([]);
       
-      // Reset file input
       const fileInput = document.getElementById('csv-file') as HTMLInputElement;
       if (fileInput) fileInput.value = '';
       
     } catch (error) {
       console.error('Upload error:', error);
+      const errorMessage = error instanceof Error ? error.message : "There was an error processing your file. Please try again.";
+      setError(errorMessage);
       toast({
         title: "Upload failed",
-        description: error instanceof Error ? error.message : "There was an error processing your file. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -155,7 +177,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Upload Lawyer Data</h1>
-        <p className="text-muted-foreground">Upload a CSV file to process with the backend and store in the database</p>
+        <p className="text-muted-foreground">Upload a CSV file to process with Supabase Edge Function and store in the database</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -186,6 +208,13 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
               </Alert>
             )}
 
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
             <div className="flex gap-2">
               <Button 
                 onClick={handlePreview} 
@@ -193,7 +222,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
                 variant="outline"
                 className="flex-1"
               >
-                {isProcessing ? 'Processing...' : 'Preview (Backend)'}
+                {isProcessing ? 'Processing...' : 'Preview'}
               </Button>
               
               <Button 
@@ -207,8 +236,8 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
 
             <div className="text-xs text-muted-foreground">
               <p>• Preview: Processes file with Supabase Edge Function and shows first 5 rows</p>
-              <p>• Upload: Processes file with Supabase Edge Function and saves all data to database</p>
-              <p>• Backend: Supabase Edge Function (serverless)</p>
+              <p>• Upload: Processes file and saves all data to database</p>
+              <p>• Processing: Supabase Edge Function (serverless)</p>
             </div>
           </CardContent>
         </Card>
