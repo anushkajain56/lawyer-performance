@@ -9,6 +9,7 @@ import { Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAddLawyers } from "@/hooks/useLawyers";
 import { Lawyer } from "@/types/lawyer";
+import { supabase } from "@/integrations/supabase/client";
 import axios from "axios";
 
 interface FileUploadProps {
@@ -44,12 +45,17 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     formData.append('file', file);
 
     try {
-      console.log('Sending file to Flask backend...');
-      const response = await axios.post('http://localhost:5000/preprocess', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      console.log('Sending file to Supabase Edge Function...');
+      const { data, error } = await supabase.functions.invoke('preprocess-csv', {
+        body: formData,
       });
+
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      const response = { data };
 
       console.log('Backend response:', response.data);
 
@@ -81,8 +87,8 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
 
       return processedLawyers;
     } catch (error) {
-      console.error('Error processing file with backend:', error);
-      throw new Error('Failed to process file with backend. Make sure your Flask server is running on localhost:5000');
+      console.error('Error processing file with Supabase Edge Function:', error);
+      throw new Error('Failed to process file with Supabase Edge Function. Please try again.');
     }
   };
 
@@ -200,9 +206,9 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
             </div>
 
             <div className="text-xs text-muted-foreground">
-              <p>• Preview: Processes file with Flask backend and shows first 5 rows</p>
-              <p>• Upload: Processes file with Flask backend and saves all data to database</p>
-              <p>• Backend URL: http://localhost:5000/preprocess</p>
+              <p>• Preview: Processes file with Supabase Edge Function and shows first 5 rows</p>
+              <p>• Upload: Processes file with Supabase Edge Function and saves all data to database</p>
+              <p>• Backend: Supabase Edge Function (serverless)</p>
             </div>
           </CardContent>
         </Card>
@@ -213,7 +219,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
           </CardHeader>
           <CardContent>
             <div className="text-sm space-y-2">
-              <p className="font-medium">Flask Backend Features:</p>
+              <p className="font-medium">Supabase Edge Function Features:</p>
               <ul className="list-disc pl-5 space-y-1 text-xs">
                 <li><strong>Feature Engineering:</strong> Calculates completion_rate, cases_remaining, complaints_per_case, reworks_per_case</li>
                 <li><strong>Data Encoding:</strong> Creates encoded flags (tat_flag_encoded, feedback_flag_encoded)</li>
@@ -232,7 +238,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
         <Card>
           <CardHeader>
             <CardTitle>Backend Processed Preview</CardTitle>
-            <p className="text-sm text-muted-foreground">First {preview.length} rows processed by Flask backend</p>
+            <p className="text-sm text-muted-foreground">First {preview.length} rows processed by Supabase Edge Function</p>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
