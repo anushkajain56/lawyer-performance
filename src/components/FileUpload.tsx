@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,55 +45,69 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     formData.append('file', file);
 
     try {
-      console.log('Sending file to Supabase Edge Function...');
+      console.log('Sending file to Supabase Edge Function...', file.name, file.size);
       
       const { data, error } = await supabase.functions.invoke('preprocess-csv', {
         body: formData,
       });
 
+      console.log('Edge Function response:', { data, error });
+
       if (error) {
         console.error('Supabase function error:', error);
-        throw new Error(`Edge Function error: ${error.message || 'Unknown error'}`);
+        throw new Error(`Processing failed: ${error.message || 'Unknown error from Edge Function'}`);
       }
 
       if (!data) {
-        throw new Error('No data returned from Edge Function');
+        throw new Error('No data returned from processing service');
       }
 
-      console.log('Backend response received:', Array.isArray(data) ? `${data.length} records` : typeof data);
+      console.log('Processing successful, received:', Array.isArray(data) ? `${data.length} records` : typeof data);
 
       // Handle case where data might be wrapped in another object
       const processedData = Array.isArray(data) ? data : (data.data ? data.data : []);
 
-      if (!Array.isArray(processedData) || processedData.length === 0) {
-        throw new Error('Invalid or empty data returned from processing');
+      if (!Array.isArray(processedData)) {
+        console.error('Invalid data structure:', processedData);
+        throw new Error('Invalid data structure returned from processing service');
+      }
+
+      if (processedData.length === 0) {
+        throw new Error('No records were processed from the CSV file');
       }
 
       // Transform backend response to match our Lawyer interface
-      const processedLawyers: Lawyer[] = processedData.map((row: any, index: number) => ({
-        lawyer_id: row.lawyer_id || `L${Date.now()}-${index}`,
-        branch_name: row.branch_name || 'Corporate',
-        allocation_month: row.allocation_month || new Date().toISOString().slice(0, 7),
-        case_id: row.case_id || `C${Date.now()}-${index}`,
-        cases_assigned: parseInt(row.cases_assigned) || 30,
-        cases_completed: parseInt(row.cases_completed) || 25,
-        completion_rate: parseFloat(row.completion_rate) || 0.8,
-        cases_remaining: parseInt(row.cases_remaining) || 5,
-        performance_score: parseFloat(row.performance_score) || 0.75,
-        tat_compliance_percent: parseFloat(row.tat_compliance_percent) || 0.8,
-        avg_tat_days: parseFloat(row.avg_tat_days) || 15,
-        tat_flag: (row.tat_flag as 'Red' | 'Green') || 'Green',
-        quality_check_flag: row.quality_check_flag === true || row.quality_check_flag === 'true',
-        client_feedback_score: parseFloat(row.client_feedback_score) || 4.0,
-        feedback_flag: row.feedback_flag === true || row.feedback_flag === 'true',
-        complaints_per_case: parseFloat(row.complaints_per_case) || 0.05,
-        reworks_per_case: parseFloat(row.reworks_per_case) || 0.1,
-        low_performance_flag: row.low_performance_flag === true || row.low_performance_flag === 'true',
-        lawyer_score: parseFloat(row.lawyer_score) || Math.random() * 0.4 + 0.6,
-        quality_rating: parseFloat(row.quality_rating) || 4.0,
-        allocation_status: (row.allocation_status as 'Allocated' | 'Available') || 'Available',
-        total_cases_ytd: parseInt(row.total_cases_ytd) || 100
-      }));
+      const processedLawyers: Lawyer[] = processedData.map((row: any, index: number) => {
+        try {
+          return {
+            lawyer_id: row.lawyer_id || `L${Date.now()}-${index}`,
+            branch_name: row.branch_name || 'Corporate',
+            allocation_month: row.allocation_month || new Date().toISOString().slice(0, 7),
+            case_id: row.case_id || `C${Date.now()}-${index}`,
+            cases_assigned: parseInt(row.cases_assigned) || 30,
+            cases_completed: parseInt(row.cases_completed) || 25,
+            completion_rate: parseFloat(row.completion_rate) || 0.8,
+            cases_remaining: parseInt(row.cases_remaining) || 5,
+            performance_score: parseFloat(row.performance_score) || 0.75,
+            tat_compliance_percent: parseFloat(row.tat_compliance_percent) || 0.8,
+            avg_tat_days: parseFloat(row.avg_tat_days) || 15,
+            tat_flag: (row.tat_flag as 'Red' | 'Green') || 'Green',
+            quality_check_flag: row.quality_check_flag === true || row.quality_check_flag === 'true',
+            client_feedback_score: parseFloat(row.client_feedback_score) || 4.0,
+            feedback_flag: row.feedback_flag === true || row.feedback_flag === 'true',
+            complaints_per_case: parseFloat(row.complaints_per_case) || 0.05,
+            reworks_per_case: parseFloat(row.reworks_per_case) || 0.1,
+            low_performance_flag: row.low_performance_flag === true || row.low_performance_flag === 'true',
+            lawyer_score: parseFloat(row.lawyer_score) || Math.random() * 0.4 + 0.6,
+            quality_rating: parseFloat(row.quality_rating) || 4.0,
+            allocation_status: (row.allocation_status as 'Allocated' | 'Available') || 'Available',
+            total_cases_ytd: parseInt(row.total_cases_ytd) || 100
+          };
+        } catch (transformError) {
+          console.error(`Error transforming row ${index}:`, transformError, row);
+          throw new Error(`Error processing row ${index + 1} in CSV file`);
+        }
+      });
 
       return processedLawyers;
     } catch (error) {
@@ -101,8 +116,10 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
       if (error instanceof Error) {
         if (error.message.includes('Failed to fetch')) {
           throw new Error('Unable to connect to the processing service. Please check your internet connection and try again.');
-        } else if (error.message.includes('Edge Function')) {
-          throw new Error('Processing service error. Please try again in a moment.');
+        } else if (error.message.includes('Processing failed')) {
+          throw new Error(error.message);
+        } else if (error.message.includes('Invalid data structure')) {
+          throw new Error('The CSV file format is not recognized. Please check your file format.');
         } else {
           throw new Error(`Processing failed: ${error.message}`);
         }
@@ -251,9 +268,10 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
               <p className="font-medium">Supabase Edge Function Features:</p>
               <ul className="list-disc pl-5 space-y-1 text-xs">
                 <li><strong>Feature Engineering:</strong> Calculates completion_rate, cases_remaining, complaints_per_case, reworks_per_case</li>
-                <li><strong>Data Encoding:</strong> Creates encoded flags (tat_flag_encoded, feedback_flag_encoded)</li>
-                <li><strong>Date Processing:</strong> Derives allocation_month_num from allocation_date</li>
+                <li><strong>Data Validation:</strong> Handles missing data and generates realistic defaults</li>
+                <li><strong>Date Processing:</strong> Derives allocation_month from allocation_date</li>
                 <li><strong>Performance Flags:</strong> Computes low_performance_flag automatically</li>
+                <li><strong>Flexible CSV Support:</strong> Handles both comma and semicolon separated files</li>
               </ul>
               <p className="text-xs text-muted-foreground mt-4">
                 The backend processes your raw CSV and returns fully transformed data ready for analysis.
