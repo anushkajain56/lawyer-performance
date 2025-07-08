@@ -1,4 +1,3 @@
-
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useAddLawyers } from "@/hooks/useLawyers";
 import { Lawyer } from "@/types/lawyer";
 
 interface FileUploadProps {
@@ -15,9 +15,9 @@ interface FileUploadProps {
 
 export function FileUpload({ onFileUpload }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
-  const [loading, setLoading] = useState(false);
   const [preview, setPreview] = useState<Lawyer[]>([]);
   const { toast } = useToast();
+  const addLawyersMutation = useAddLawyers();
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files?.[0];
@@ -39,17 +39,17 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = e.target?.result as string;
-      const lines = text.split('\n');
-      const headers = lines[0].split(',').map(h => h.trim());
+      const lines = text.split('\n').filter(line => line.trim());
+      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
       
       // Parse first few rows for preview
       const previewData: Lawyer[] = lines.slice(1, 6).map((line, index) => {
-        const values = line.split(',').map(v => v.trim());
+        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
         return {
-          lawyer_id: values[0] || `L${index + 1}`,
+          lawyer_id: values[0] || `L${Date.now()}-${index}`,
           branch_name: values[1] || 'Corporate',
           allocation_month: values[2] || '2024-01',
-          case_id: values[3] || `C${index + 1}`,
+          case_id: values[3] || `C${Date.now()}-${index}`,
           cases_assigned: parseInt(values[4]) || 30,
           cases_completed: parseInt(values[5]) || 25,
           completion_rate: parseFloat(values[6]) || 0.8,
@@ -64,7 +64,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
           complaints_per_case: parseFloat(values[15]) || 0.05,
           reworks_per_case: parseFloat(values[16]) || 0.1,
           low_performance_flag: values[17] === 'true' || false,
-          lawyer_score: Math.random() * 0.4 + 0.6, // Mock ML prediction
+          lawyer_score: parseFloat(values[18]) || Math.random() * 0.4 + 0.6,
           quality_rating: parseFloat(values[19]) || 4.0,
           allocation_status: (values[20] as 'Allocated' | 'Available') || 'Available',
           total_cases_ytd: parseInt(values[21]) || 100
@@ -79,37 +79,63 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
   const handleUpload = async () => {
     if (!file) return;
 
-    setLoading(true);
     try {
-      // Simulate file processing
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      // In real implementation, this would call your backend API
-      const processedLawyers: Lawyer[] = preview.map((lawyer, index) => ({
-        ...lawyer,
-        lawyer_id: lawyer.lawyer_id || `uploaded-${Date.now()}-${index}`,
-        lawyer_score: Math.random() * 0.4 + 0.6, // Mock ML prediction
-        allocation_month: new Date().toISOString().slice(0, 7)
-      }));
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const text = e.target?.result as string;
+        const lines = text.split('\n').filter(line => line.trim());
+        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+        
+        const processedLawyers: Lawyer[] = lines.slice(1).map((line, index) => {
+          const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
+          return {
+            lawyer_id: values[0] || `uploaded-${Date.now()}-${index}`,
+            branch_name: values[1] || 'Corporate',
+            allocation_month: values[2] || new Date().toISOString().slice(0, 7),
+            case_id: values[3] || `C${Date.now()}-${index}`,
+            cases_assigned: parseInt(values[4]) || 30,
+            cases_completed: parseInt(values[5]) || 25,
+            completion_rate: parseFloat(values[6]) || 0.8,
+            cases_remaining: parseInt(values[7]) || 5,
+            performance_score: parseFloat(values[8]) || 0.75,
+            tat_compliance_percent: parseFloat(values[9]) || 0.8,
+            avg_tat_days: parseFloat(values[10]) || 15,
+            tat_flag: (values[11] as 'Red' | 'Green') || 'Green',
+            quality_check_flag: values[12] === 'true' || false,
+            client_feedback_score: parseFloat(values[13]) || 4.0,
+            feedback_flag: values[14] === 'true' || false,
+            complaints_per_case: parseFloat(values[15]) || 0.05,
+            reworks_per_case: parseFloat(values[16]) || 0.1,
+            low_performance_flag: values[17] === 'true' || false,
+            lawyer_score: parseFloat(values[18]) || Math.random() * 0.4 + 0.6,
+            quality_rating: parseFloat(values[19]) || 4.0,
+            allocation_status: (values[20] as 'Allocated' | 'Available') || 'Available',
+            total_cases_ytd: parseInt(values[21]) || 100
+          };
+        }).filter(lawyer => lawyer.lawyer_id && lawyer.lawyer_id !== '');
 
-      onFileUpload(processedLawyers);
+        // Use the mutation to upload to database
+        await addLawyersMutation.mutateAsync(processedLawyers);
+        
+        onFileUpload(processedLawyers);
+        
+        setFile(null);
+        setPreview([]);
+        
+        // Reset file input
+        const fileInput = document.getElementById('csv-file') as HTMLInputElement;
+        if (fileInput) fileInput.value = '';
+      };
       
-      toast({
-        title: "Upload successful",
-        description: `Processed ${processedLawyers.length} lawyer records with performance predictions.`,
-      });
-
-      setFile(null);
-      setPreview([]);
+      reader.readAsText(file);
       
     } catch (error) {
+      console.error('Upload error:', error);
       toast({
         title: "Upload failed",
         description: "There was an error processing your file. Please try again.",
         variant: "destructive",
       });
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -117,7 +143,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Upload Lawyer Data</h1>
-        <p className="text-muted-foreground">Upload a CSV file to get performance predictions for lawyers</p>
+        <p className="text-muted-foreground">Upload a CSV file to store performance data in the database</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -150,10 +176,10 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
 
             <Button 
               onClick={handleUpload} 
-              disabled={!file || loading}
+              disabled={!file || addLawyersMutation.isPending}
               className="w-full"
             >
-              {loading ? 'Processing...' : 'Upload & Predict'}
+              {addLawyersMutation.isPending ? 'Uploading...' : 'Upload to Database'}
             </Button>
           </CardContent>
         </Card>
@@ -169,10 +195,10 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
                 <li><strong>Basic Info:</strong> lawyer_id, branch_name, allocation_month, case_id</li>
                 <li><strong>Performance:</strong> cases_assigned, cases_completed, completion_rate, cases_remaining, performance_score, tat_compliance_percent, avg_tat_days</li>
                 <li><strong>Quality:</strong> tat_flag (Red/Green), quality_check_flag (true/false), client_feedback_score, feedback_flag (true/false), complaints_per_case, reworks_per_case, low_performance_flag (true/false)</li>
-                <li><strong>Summary:</strong> quality_rating, allocation_status (Allocated/Available), total_cases_ytd</li>
+                <li><strong>Summary:</strong> lawyer_score, quality_rating, allocation_status (Allocated/Available), total_cases_ytd</li>
               </ul>
               <p className="text-xs text-muted-foreground mt-4">
-                The system will automatically calculate lawyer_score based on these features.
+                Data will be stored in the database and available across all views.
               </p>
             </div>
           </CardContent>

@@ -6,22 +6,30 @@ import { LawyerTable } from "@/components/LawyerTable";
 import { LawyerDetails } from "@/components/LawyerDetails";
 import { FileUpload } from "@/components/FileUpload";
 import { DashboardOverview } from "@/components/DashboardOverview";
-import { mockLawyers } from "@/data/mockData";
+import { useLawyers } from "@/hooks/useLawyers";
 import { Lawyer } from "@/types/lawyer";
 
 export default function Dashboard() {
   const [selectedLawyer, setSelectedLawyer] = useState<Lawyer | null>(null);
-  const [lawyers, setLawyers] = useState<Lawyer[]>(mockLawyers);
-  const [filteredLawyers, setFilteredLawyers] = useState<Lawyer[]>(mockLawyers);
+  const [filteredLawyers, setFilteredLawyers] = useState<Lawyer[]>([]);
   const [activeView, setActiveView] = useState<'overview' | 'table' | 'upload'>('overview');
+
+  const { data: lawyers = [], isLoading, error } = useLawyers();
+
+  // Initialize filtered lawyers when data loads
+  useState(() => {
+    if (lawyers.length > 0 && filteredLawyers.length === 0) {
+      setFilteredLawyers(lawyers);
+    }
+  });
 
   const handleLawyerSelect = (lawyer: Lawyer) => {
     setSelectedLawyer(lawyer);
   };
 
   const handleFileUpload = (newLawyers: Lawyer[]) => {
-    setLawyers(newLawyers);
-    setFilteredLawyers(newLawyers);
+    // The mutation will handle updating the data
+    // The query will automatically refetch after successful upload
   };
 
   const handleFilterChange = (filters: any) => {
@@ -67,6 +75,33 @@ export default function Dashboard() {
     setFilteredLawyers(filtered);
   };
 
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Loading lawyer data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-red-600 mb-4">Error loading data: {error.message}</p>
+          <button 
+            onClick={() => window.location.reload()} 
+            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full">
@@ -78,12 +113,12 @@ export default function Dashboard() {
         <SidebarInset className="flex-1">
           <main className="p-6 h-full">
             {activeView === 'overview' && (
-              <DashboardOverview lawyers={filteredLawyers} />
+              <DashboardOverview lawyers={filteredLawyers.length > 0 ? filteredLawyers : lawyers} />
             )}
             
             {activeView === 'table' && !selectedLawyer && (
               <LawyerTable 
-                lawyers={filteredLawyers} 
+                lawyers={filteredLawyers.length > 0 ? filteredLawyers : lawyers} 
                 onLawyerSelect={handleLawyerSelect}
               />
             )}
