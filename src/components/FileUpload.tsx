@@ -1,3 +1,4 @@
+
 import { useState, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -8,6 +9,7 @@ import { Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useAddLawyers } from "@/hooks/useLawyers";
 import { Lawyer } from "@/types/lawyer";
+import axios from "axios";
 
 interface FileUploadProps {
   onFileUpload: (lawyers: Lawyer[]) => void;
@@ -16,6 +18,7 @@ interface FileUploadProps {
 export function FileUpload({ onFileUpload }: FileUploadProps) {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<Lawyer[]>([]);
+  const [isProcessing, setIsProcessing] = useState(false);
   const { toast } = useToast();
   const addLawyersMutation = useAddLawyers();
 
@@ -31,111 +34,114 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
         return;
       }
       setFile(selectedFile);
-      parseCSVPreview(selectedFile);
+      // Clear previous preview when new file is selected
+      setPreview([]);
     }
   };
 
-  const parseCSVPreview = useCallback((file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      const text = e.target?.result as string;
-      const lines = text.split('\n').filter(line => line.trim());
-      const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
+  const processFileWithBackend = async (file: File): Promise<Lawyer[]> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      console.log('Sending file to Flask backend...');
+      const response = await axios.post('http://localhost:5000/preprocess', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      console.log('Backend response:', response.data);
+
+      // Transform backend response to match our Lawyer interface
+      const processedLawyers: Lawyer[] = response.data.map((row: any) => ({
+        lawyer_id: row.lawyer_id || `L${Date.now()}-${Math.random()}`,
+        branch_name: row.branch_name || 'Corporate',
+        allocation_month: row.allocation_month || new Date().toISOString().slice(0, 7),
+        case_id: row.case_id || `C${Date.now()}-${Math.random()}`,
+        cases_assigned: parseInt(row.cases_assigned) || 30,
+        cases_completed: parseInt(row.cases_completed) || 25,
+        completion_rate: parseFloat(row.completion_rate) || 0.8,
+        cases_remaining: parseInt(row.cases_remaining) || 5,
+        performance_score: parseFloat(row.performance_score) || 0.75,
+        tat_compliance_percent: parseFloat(row.tat_compliance_percent) || 0.8,
+        avg_tat_days: parseFloat(row.avg_tat_days) || 15,
+        tat_flag: (row.tat_flag as 'Red' | 'Green') || 'Green',
+        quality_check_flag: row.quality_check_flag === true || row.quality_check_flag === 'true',
+        client_feedback_score: parseFloat(row.client_feedback_score) || 4.0,
+        feedback_flag: row.feedback_flag === true || row.feedback_flag === 'true',
+        complaints_per_case: parseFloat(row.complaints_per_case) || 0.05,
+        reworks_per_case: parseFloat(row.reworks_per_case) || 0.1,
+        low_performance_flag: row.low_performance_flag === true || row.low_performance_flag === 'true',
+        lawyer_score: parseFloat(row.lawyer_score) || Math.random() * 0.4 + 0.6,
+        quality_rating: parseFloat(row.quality_rating) || 4.0,
+        allocation_status: (row.allocation_status as 'Allocated' | 'Available') || 'Available',
+        total_cases_ytd: parseInt(row.total_cases_ytd) || 100
+      }));
+
+      return processedLawyers;
+    } catch (error) {
+      console.error('Error processing file with backend:', error);
+      throw new Error('Failed to process file with backend. Make sure your Flask server is running on localhost:5000');
+    }
+  };
+
+  const handlePreview = async () => {
+    if (!file) return;
+
+    setIsProcessing(true);
+    try {
+      const processedData = await processFileWithBackend(file);
+      // Show first 5 rows for preview
+      setPreview(processedData.slice(0, 5));
       
-      // Parse first few rows for preview
-      const previewData: Lawyer[] = lines.slice(1, 6).map((line, index) => {
-        const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
-        return {
-          lawyer_id: values[0] || `L${Date.now()}-${index}`,
-          branch_name: values[1] || 'Corporate',
-          allocation_month: values[2] || '2024-01',
-          case_id: values[3] || `C${Date.now()}-${index}`,
-          cases_assigned: parseInt(values[4]) || 30,
-          cases_completed: parseInt(values[5]) || 25,
-          completion_rate: parseFloat(values[6]) || 0.8,
-          cases_remaining: parseInt(values[7]) || 5,
-          performance_score: parseFloat(values[8]) || 0.75,
-          tat_compliance_percent: parseFloat(values[9]) || 0.8,
-          avg_tat_days: parseFloat(values[10]) || 15,
-          tat_flag: (values[11] as 'Red' | 'Green') || 'Green',
-          quality_check_flag: values[12] === 'true' || false,
-          client_feedback_score: parseFloat(values[13]) || 4.0,
-          feedback_flag: values[14] === 'true' || false,
-          complaints_per_case: parseFloat(values[15]) || 0.05,
-          reworks_per_case: parseFloat(values[16]) || 0.1,
-          low_performance_flag: values[17] === 'true' || false,
-          lawyer_score: parseFloat(values[18]) || Math.random() * 0.4 + 0.6,
-          quality_rating: parseFloat(values[19]) || 4.0,
-          allocation_status: (values[20] as 'Allocated' | 'Available') || 'Available',
-          total_cases_ytd: parseInt(values[21]) || 100
-        };
-      }).filter(lawyer => lawyer.lawyer_id && lawyer.lawyer_id !== '');
-      
-      setPreview(previewData);
-    };
-    reader.readAsText(file);
-  }, []);
+      toast({
+        title: "File processed successfully",
+        description: `Preview showing first ${Math.min(5, processedData.length)} rows from ${processedData.length} total records.`,
+      });
+    } catch (error) {
+      console.error('Preview error:', error);
+      toast({
+        title: "Preview failed",
+        description: error instanceof Error ? error.message : "Failed to process file for preview.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   const handleUpload = async () => {
     if (!file) return;
 
+    setIsProcessing(true);
     try {
-      const reader = new FileReader();
-      reader.onload = async (e) => {
-        const text = e.target?.result as string;
-        const lines = text.split('\n').filter(line => line.trim());
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-        
-        const processedLawyers: Lawyer[] = lines.slice(1).map((line, index) => {
-          const values = line.split(',').map(v => v.trim().replace(/"/g, ''));
-          return {
-            lawyer_id: values[0] || `uploaded-${Date.now()}-${index}`,
-            branch_name: values[1] || 'Corporate',
-            allocation_month: values[2] || new Date().toISOString().slice(0, 7),
-            case_id: values[3] || `C${Date.now()}-${index}`,
-            cases_assigned: parseInt(values[4]) || 30,
-            cases_completed: parseInt(values[5]) || 25,
-            completion_rate: parseFloat(values[6]) || 0.8,
-            cases_remaining: parseInt(values[7]) || 5,
-            performance_score: parseFloat(values[8]) || 0.75,
-            tat_compliance_percent: parseFloat(values[9]) || 0.8,
-            avg_tat_days: parseFloat(values[10]) || 15,
-            tat_flag: (values[11] as 'Red' | 'Green') || 'Green',
-            quality_check_flag: values[12] === 'true' || false,
-            client_feedback_score: parseFloat(values[13]) || 4.0,
-            feedback_flag: values[14] === 'true' || false,
-            complaints_per_case: parseFloat(values[15]) || 0.05,
-            reworks_per_case: parseFloat(values[16]) || 0.1,
-            low_performance_flag: values[17] === 'true' || false,
-            lawyer_score: parseFloat(values[18]) || Math.random() * 0.4 + 0.6,
-            quality_rating: parseFloat(values[19]) || 4.0,
-            allocation_status: (values[20] as 'Allocated' | 'Available') || 'Available',
-            total_cases_ytd: parseInt(values[21]) || 100
-          };
-        }).filter(lawyer => lawyer.lawyer_id && lawyer.lawyer_id !== '');
-
-        // Use the mutation to upload to database
-        await addLawyersMutation.mutateAsync(processedLawyers);
-        
-        onFileUpload(processedLawyers);
-        
-        setFile(null);
-        setPreview([]);
-        
-        // Reset file input
-        const fileInput = document.getElementById('csv-file') as HTMLInputElement;
-        if (fileInput) fileInput.value = '';
-      };
+      // Process file with backend
+      const processedLawyers = await processFileWithBackend(file);
       
-      reader.readAsText(file);
+      // Upload processed data to Supabase
+      await addLawyersMutation.mutateAsync(processedLawyers);
+      
+      // Notify parent component
+      onFileUpload(processedLawyers);
+      
+      // Reset form
+      setFile(null);
+      setPreview([]);
+      
+      // Reset file input
+      const fileInput = document.getElementById('csv-file') as HTMLInputElement;
+      if (fileInput) fileInput.value = '';
       
     } catch (error) {
       console.error('Upload error:', error);
       toast({
         title: "Upload failed",
-        description: "There was an error processing your file. Please try again.",
+        description: error instanceof Error ? error.message : "There was an error processing your file. Please try again.",
         variant: "destructive",
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -143,7 +149,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Upload Lawyer Data</h1>
-        <p className="text-muted-foreground">Upload a CSV file to store performance data in the database</p>
+        <p className="text-muted-foreground">Upload a CSV file to process with the backend and store in the database</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -151,7 +157,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
           <CardHeader>
             <CardTitle className="flex items-center">
               <Upload className="mr-2 h-5 w-5" />
-              File Upload
+              File Upload & Processing
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -174,31 +180,48 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
               </Alert>
             )}
 
-            <Button 
-              onClick={handleUpload} 
-              disabled={!file || addLawyersMutation.isPending}
-              className="w-full"
-            >
-              {addLawyersMutation.isPending ? 'Uploading...' : 'Upload to Database'}
-            </Button>
+            <div className="flex gap-2">
+              <Button 
+                onClick={handlePreview} 
+                disabled={!file || isProcessing}
+                variant="outline"
+                className="flex-1"
+              >
+                {isProcessing ? 'Processing...' : 'Preview (Backend)'}
+              </Button>
+              
+              <Button 
+                onClick={handleUpload} 
+                disabled={!file || isProcessing || addLawyersMutation.isPending}
+                className="flex-1"
+              >
+                {isProcessing || addLawyersMutation.isPending ? 'Uploading...' : 'Process & Upload'}
+              </Button>
+            </div>
+
+            <div className="text-xs text-muted-foreground">
+              <p>• Preview: Processes file with Flask backend and shows first 5 rows</p>
+              <p>• Upload: Processes file with Flask backend and saves all data to database</p>
+              <p>• Backend URL: http://localhost:5000/preprocess</p>
+            </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Expected CSV Format</CardTitle>
+            <CardTitle>Backend Integration</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-sm space-y-2">
-              <p className="font-medium">Required columns:</p>
+              <p className="font-medium">Flask Backend Features:</p>
               <ul className="list-disc pl-5 space-y-1 text-xs">
-                <li><strong>Basic Info:</strong> lawyer_id, branch_name, allocation_month, case_id</li>
-                <li><strong>Performance:</strong> cases_assigned, cases_completed, completion_rate, cases_remaining, performance_score, tat_compliance_percent, avg_tat_days</li>
-                <li><strong>Quality:</strong> tat_flag (Red/Green), quality_check_flag (true/false), client_feedback_score, feedback_flag (true/false), complaints_per_case, reworks_per_case, low_performance_flag (true/false)</li>
-                <li><strong>Summary:</strong> lawyer_score, quality_rating, allocation_status (Allocated/Available), total_cases_ytd</li>
+                <li><strong>Feature Engineering:</strong> Calculates completion_rate, cases_remaining, complaints_per_case, reworks_per_case</li>
+                <li><strong>Data Encoding:</strong> Creates encoded flags (tat_flag_encoded, feedback_flag_encoded)</li>
+                <li><strong>Date Processing:</strong> Derives allocation_month_num from allocation_date</li>
+                <li><strong>Performance Flags:</strong> Computes low_performance_flag automatically</li>
               </ul>
               <p className="text-xs text-muted-foreground mt-4">
-                Data will be stored in the database and available across all views.
+                The backend processes your raw CSV and returns fully transformed data ready for analysis.
               </p>
             </div>
           </CardContent>
@@ -208,8 +231,8 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
       {preview.length > 0 && (
         <Card>
           <CardHeader>
-            <CardTitle>Data Preview</CardTitle>
-            <p className="text-sm text-muted-foreground">First {preview.length} rows from your CSV</p>
+            <CardTitle>Backend Processed Preview</CardTitle>
+            <p className="text-sm text-muted-foreground">First {preview.length} rows processed by Flask backend</p>
           </CardHeader>
           <CardContent>
             <div className="overflow-x-auto">
@@ -221,6 +244,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
                     <th className="text-left p-2">Cases Assigned</th>
                     <th className="text-left p-2">Cases Completed</th>
                     <th className="text-left p-2">Completion Rate</th>
+                    <th className="text-left p-2">Low Performance</th>
                     <th className="text-left p-2">Lawyer Score</th>
                   </tr>
                 </thead>
@@ -232,6 +256,13 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
                       <td className="p-2">{lawyer.cases_assigned}</td>
                       <td className="p-2">{lawyer.cases_completed}</td>
                       <td className="p-2">{(lawyer.completion_rate * 100).toFixed(1)}%</td>
+                      <td className="p-2">
+                        {lawyer.low_performance_flag ? (
+                          <span className="text-red-600 font-medium">Yes</span>
+                        ) : (
+                          <span className="text-green-600">No</span>
+                        )}
+                      </td>
                       <td className="p-2 font-bold text-blue-600">
                         {(lawyer.lawyer_score * 100).toFixed(1)}%
                       </td>
