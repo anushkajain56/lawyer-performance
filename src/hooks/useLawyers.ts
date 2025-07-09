@@ -23,7 +23,7 @@ export const useLawyers = () => {
         lawyer_id: lawyer.lawyer_id,
         lawyer_name: lawyer.lawyer_name || undefined,
         branch_name: lawyer.branch_name,
-        domain: lawyer.domain || undefined,
+        expertise_domains: lawyer.domain || undefined, // Map domain to expertise_domains
         allocation_month: lawyer.allocation_month,
         case_id: lawyer.case_id || '',
         cases_assigned: lawyer.cases_assigned || 0,
@@ -65,7 +65,7 @@ export const useAddLawyers = () => {
           lawyer_name: lawyer.lawyer_name || null,
           branch_id: null, // Will be added if available in CSV
           branch_name: lawyer.branch_name,
-          domain: lawyer.domain || null,
+          domain: lawyer.expertise_domains || null, // Map expertise_domains to domain for database
           allocation_month: lawyer.allocation_month,
           allocation_date: null, // Will be added if available in CSV
           case_id: lawyer.case_id,
