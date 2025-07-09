@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
 import { LawyerTable } from "@/components/LawyerTable";
@@ -17,11 +17,11 @@ export default function Dashboard() {
   const { data: lawyers = [], isLoading, error } = useLawyers();
 
   // Initialize filtered lawyers when data loads
-  useState(() => {
-    if (lawyers.length > 0 && filteredLawyers.length === 0) {
+  useEffect(() => {
+    if (lawyers.length > 0) {
       setFilteredLawyers(lawyers);
     }
-  });
+  }, [lawyers]);
 
   const handleLawyerSelect = (lawyer: Lawyer) => {
     setSelectedLawyer(lawyer);
@@ -131,12 +131,12 @@ export default function Dashboard() {
           <main className="p-6 h-full">
             <div className="animate-fade-in">
               {activeView === 'overview' && (
-                <DashboardOverview lawyers={filteredLawyers.length > 0 ? filteredLawyers : lawyers} />
+                <DashboardOverview lawyers={filteredLawyers} />
               )}
               
               {activeView === 'table' && !selectedLawyer && (
                 <LawyerTable 
-                  lawyers={filteredLawyers.length > 0 ? filteredLawyers : lawyers} 
+                  lawyers={filteredLawyers} 
                   onLawyerSelect={handleLawyerSelect}
                 />
               )}

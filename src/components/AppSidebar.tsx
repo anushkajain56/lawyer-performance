@@ -17,7 +17,6 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
-import { branches } from "@/data/mockData";
 import { Lawyer } from "@/types/lawyer";
 
 interface AppSidebarProps {
@@ -41,19 +40,20 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange, lawyers }
 
   // Extract unique domains from lawyers data
   const [domains, setDomains] = useState<string[]>([]);
-
-  useEffect(() => {
-    if (lawyers.length > 0) {
-      const uniqueDomains = [...new Set(lawyers.map(lawyer => lawyer.domain).filter(Boolean))];
-      setDomains(uniqueDomains);
-    }
-  }, [lawyers]);
-
-  // Extract unique allocation statuses from lawyers data
+  const [branches, setBranches] = useState<string[]>([]);
   const [allocationStatuses, setAllocationStatuses] = useState<string[]>([]);
 
   useEffect(() => {
     if (lawyers.length > 0) {
+      // Extract unique domains
+      const uniqueDomains = [...new Set(lawyers.map(lawyer => lawyer.domain).filter(Boolean))];
+      setDomains(uniqueDomains);
+
+      // Extract unique branches
+      const uniqueBranches = [...new Set(lawyers.map(lawyer => lawyer.branch_name).filter(Boolean))];
+      setBranches(uniqueBranches);
+
+      // Extract unique allocation statuses
       const uniqueStatuses = [...new Set(lawyers.map(lawyer => lawyer.allocation_status).filter(Boolean))];
       setAllocationStatuses(uniqueStatuses);
     }

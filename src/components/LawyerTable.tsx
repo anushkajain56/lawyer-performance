@@ -117,10 +117,10 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
                 {filteredAndSorted.map((lawyer) => (
                   <TableRow 
                     key={lawyer.lawyer_id} 
-                    className={`hover:bg-muted/50 ${lawyer.low_performance_flag ? 'bg-red-50 border-red-200' : ''}`}
+                    className="hover:bg-muted/50"
                   >
                     <TableCell className="font-medium">
-                      {lawyer.lawyer_name || 'N/A'}
+                      {lawyer.lawyer_name || lawyer.lawyer_id}
                     </TableCell>
                     <TableCell>{lawyer.lawyer_id}</TableCell>
                     <TableCell>{lawyer.branch_name}</TableCell>
@@ -128,7 +128,7 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
                       {lawyer.domain ? (
                         <Badge variant="outline">{lawyer.domain}</Badge>
                       ) : (
-                        'N/A'
+                        <span className="text-muted-foreground">Not specified</span>
                       )}
                     </TableCell>
                     <TableCell>
