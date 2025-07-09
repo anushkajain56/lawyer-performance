@@ -21,7 +21,9 @@ export const useLawyers = () => {
       // Transform database data to match our Lawyer type
       return data.map((lawyer): Lawyer => ({
         lawyer_id: lawyer.lawyer_id,
+        lawyer_name: lawyer.lawyer_name || undefined,
         branch_name: lawyer.branch_name,
+        domain: lawyer.domain || undefined,
         allocation_month: lawyer.allocation_month,
         case_id: lawyer.case_id || '',
         cases_assigned: lawyer.cases_assigned || 0,
@@ -40,7 +42,7 @@ export const useLawyers = () => {
         low_performance_flag: lawyer.low_performance_flag || false,
         lawyer_score: Number(lawyer.lawyer_score) || 0,
         quality_rating: Number(lawyer.client_feedback_score) || 0,
-        allocation_status: (lawyer.allocation_status as 'Allocated' | 'Available') || 'Available',
+        allocation_status: (lawyer.allocation_status as 'Allocated' | 'Available' | 'Pending' | 'Completed') || 'Available',
         total_cases_ytd: lawyer.total_cases_ytd || 0
       }));
     },

@@ -27,10 +27,15 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
   };
 
   const filteredAndSorted = lawyers
-    .filter(lawyer => 
-      lawyer.lawyer_id.toLowerCase().includes(localSearch.toLowerCase()) ||
-      lawyer.branch_name.toLowerCase().includes(localSearch.toLowerCase())
-    )
+    .filter(lawyer => {
+      const searchLower = localSearch.toLowerCase();
+      return (
+        (lawyer.lawyer_name && lawyer.lawyer_name.toLowerCase().includes(searchLower)) ||
+        lawyer.lawyer_id.toLowerCase().includes(searchLower) ||
+        lawyer.branch_name.toLowerCase().includes(searchLower) ||
+        (lawyer.domain && lawyer.domain.toLowerCase().includes(searchLower))
+      );
+    })
     .sort((a, b) => {
       const aVal = a[sortField];
       const bVal = b[sortField];
@@ -39,8 +44,8 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
         return sortDirection === 'asc' ? aVal - bVal : bVal - aVal;
       }
       
-      const aStr = String(aVal).toLowerCase();
-      const bStr = String(bVal).toLowerCase();
+      const aStr = String(aVal || '').toLowerCase();
+      const bStr = String(bVal || '').toLowerCase();
       return sortDirection === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
     });
 
@@ -53,7 +58,7 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
         </div>
         <div className="w-72">
           <Input
-            placeholder="Search lawyers by ID or branch..."
+            placeholder="Search lawyers by name, ID, location, or domain..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
           />
@@ -71,6 +76,12 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
                 <TableRow>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleSort('lawyer_name')}
+                  >
+                    Lawyer Name {sortField === 'lawyer_name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort('lawyer_id')}
                   >
                     Lawyer ID {sortField === 'lawyer_id' && (sortDirection === 'asc' ? '↑' : '↓')}
@@ -79,7 +90,19 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
                     className="cursor-pointer hover:bg-muted/50"
                     onClick={() => handleSort('branch_name')}
                   >
-                    Branch {sortField === 'branch_name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Location {sortField === 'branch_name' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleSort('domain')}
+                  >
+                    Domain {sortField === 'domain' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  </TableHead>
+                  <TableHead 
+                    className="cursor-pointer hover:bg-muted/50"
+                    onClick={() => handleSort('allocation_status')}
+                  >
+                    Status {sortField === 'allocation_status' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
@@ -87,15 +110,6 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
                   >
                     Lawyer Score {sortField === 'lawyer_score' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </TableHead>
-                  <TableHead 
-                    className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('completion_rate')}
-                  >
-                    Completion Rate {sortField === 'completion_rate' && (sortDirection === 'asc' ? '↑' : '↓')}
-                  </TableHead>
-                  <TableHead>TAT Flag</TableHead>
-                  <TableHead>Performance Flag</TableHead>
-                  <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -105,8 +119,23 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
                     key={lawyer.lawyer_id} 
                     className={`hover:bg-muted/50 ${lawyer.low_performance_flag ? 'bg-red-50 border-red-200' : ''}`}
                   >
-                    <TableCell className="font-medium">{lawyer.lawyer_id}</TableCell>
+                    <TableCell className="font-medium">
+                      {lawyer.lawyer_name || 'N/A'}
+                    </TableCell>
+                    <TableCell>{lawyer.lawyer_id}</TableCell>
                     <TableCell>{lawyer.branch_name}</TableCell>
+                    <TableCell>
+                      {lawyer.domain ? (
+                        <Badge variant="outline">{lawyer.domain}</Badge>
+                      ) : (
+                        'N/A'
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant={lawyer.allocation_status === 'Allocated' ? 'default' : 'outline'}>
+                        {lawyer.allocation_status}
+                      </Badge>
+                    </TableCell>
                     <TableCell>
                       <div className="flex items-center space-x-2">
                         <span className="font-bold">
@@ -114,27 +143,14 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
                         </span>
                         <div className="w-20 bg-gray-200 rounded-full h-2">
                           <div 
-                            className="bg-blue-600 h-2 rounded-full" 
+                            className={`h-2 rounded-full ${
+                              lawyer.lawyer_score >= 0.8 ? 'bg-green-600' :
+                              lawyer.lawyer_score >= 0.6 ? 'bg-yellow-600' : 'bg-red-600'
+                            }`}
                             style={{ width: `${lawyer.lawyer_score * 100}%` }}
                           />
                         </div>
                       </div>
-                    </TableCell>
-                    <TableCell>{(lawyer.completion_rate * 100).toFixed(1)}%</TableCell>
-                    <TableCell>
-                      <Badge variant={lawyer.tat_flag === 'Green' ? 'default' : 'destructive'}>
-                        {lawyer.tat_flag}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {lawyer.low_performance_flag && (
-                        <Badge variant="destructive">Low Performance</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={lawyer.allocation_status === 'Allocated' ? 'outline' : 'default'}>
-                        {lawyer.allocation_status}
-                      </Badge>
                     </TableCell>
                     <TableCell>
                       <Button

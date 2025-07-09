@@ -2,7 +2,9 @@
 export interface Lawyer {
   // Basic Info
   lawyer_id: string;
+  lawyer_name?: string;
   branch_name: string;
+  domain?: string;
   allocation_month: string;
   case_id: string;
   
@@ -27,12 +29,15 @@ export interface Lawyer {
   // Summary
   lawyer_score: number;
   quality_rating: number;
-  allocation_status: 'Allocated' | 'Available';
+  allocation_status: 'Allocated' | 'Available' | 'Pending' | 'Completed';
   total_cases_ytd: number;
 }
 
 export interface FilterState {
   branch_name: string;
+  domain: string;
   low_performance_flag: boolean;
   searchTerm: string;
+  allocation_status: string;
+  lawyer_score_range: [number, number];
 }

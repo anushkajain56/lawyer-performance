@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ChevronDown, Upload, Table, Filter } from "lucide-react";
 import {
   Sidebar,
@@ -18,16 +18,19 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { branches } from "@/data/mockData";
+import { Lawyer } from "@/types/lawyer";
 
 interface AppSidebarProps {
   onViewChange: (view: 'overview' | 'table' | 'upload') => void;
   activeView: string;
   onFilterChange: (filters: any) => void;
+  lawyers: Lawyer[];
 }
 
-export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSidebarProps) {
+export function AppSidebar({ onViewChange, activeView, onFilterChange, lawyers }: AppSidebarProps) {
   const [filters, setFilters] = useState({
     branch_name: 'all',
+    domain: 'all',
     low_performance_flag: false,
     searchTerm: '',
     tat_flag: 'all',
@@ -35,6 +38,26 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSide
     lawyer_score_range: [0, 1],
     completion_rate_range: [0, 1]
   });
+
+  // Extract unique domains from lawyers data
+  const [domains, setDomains] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (lawyers.length > 0) {
+      const uniqueDomains = [...new Set(lawyers.map(lawyer => lawyer.domain).filter(Boolean))];
+      setDomains(uniqueDomains);
+    }
+  }, [lawyers]);
+
+  // Extract unique allocation statuses from lawyers data
+  const [allocationStatuses, setAllocationStatuses] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (lawyers.length > 0) {
+      const uniqueStatuses = [...new Set(lawyers.map(lawyer => lawyer.allocation_status).filter(Boolean))];
+      setAllocationStatuses(uniqueStatuses);
+    }
+  }, [lawyers]);
 
   const handleFilterUpdate = (key: string, value: any) => {
     const newFilters = { ...filters, [key]: value };
@@ -85,23 +108,23 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSide
               <Label htmlFor="search">Search Lawyers</Label>
               <Input
                 id="search"
-                placeholder="Lawyer ID or branch..."
+                placeholder="Lawyer name, ID, or location..."
                 value={filters.searchTerm}
                 onChange={(e) => handleFilterUpdate('searchTerm', e.target.value)}
               />
             </div>
 
             <div>
-              <Label htmlFor="branch">Branch</Label>
+              <Label htmlFor="branch">Location (Branch)</Label>
               <Select 
                 value={filters.branch_name} 
                 onValueChange={(value) => handleFilterUpdate('branch_name', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select branch" />
+                  <SelectValue placeholder="Select location" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Branches</SelectItem>
+                  <SelectItem value="all">All Locations</SelectItem>
                   {branches.map((branch) => (
                     <SelectItem key={branch} value={branch}>
                       {branch}
@@ -112,18 +135,21 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSide
             </div>
 
             <div>
-              <Label htmlFor="tatFlag">TAT Flag</Label>
+              <Label htmlFor="domain">Domain</Label>
               <Select 
-                value={filters.tat_flag} 
-                onValueChange={(value) => handleFilterUpdate('tat_flag', value)}
+                value={filters.domain} 
+                onValueChange={(value) => handleFilterUpdate('domain', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select TAT status" />
+                  <SelectValue placeholder="Select domain" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All TAT Status</SelectItem>
-                  <SelectItem value="Green">Green</SelectItem>
-                  <SelectItem value="Red">Red</SelectItem>
+                  <SelectItem value="all">All Domains</SelectItem>
+                  {domains.map((domain) => (
+                    <SelectItem key={domain} value={domain}>
+                      {domain}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -139,8 +165,11 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange }: AppSide
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Status</SelectItem>
-                  <SelectItem value="Allocated">Allocated</SelectItem>
-                  <SelectItem value="Available">Available</SelectItem>
+                  {allocationStatuses.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {status}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

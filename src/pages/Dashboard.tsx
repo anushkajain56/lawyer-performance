@@ -39,6 +39,10 @@ export default function Dashboard() {
       filtered = filtered.filter(lawyer => lawyer.branch_name === filters.branch_name);
     }
     
+    if (filters.domain && filters.domain !== 'all') {
+      filtered = filtered.filter(lawyer => lawyer.domain === filters.domain);
+    }
+    
     if (filters.tat_flag && filters.tat_flag !== 'all') {
       filtered = filtered.filter(lawyer => lawyer.tat_flag === filters.tat_flag);
     }
@@ -66,9 +70,11 @@ export default function Dashboard() {
     }
     
     if (filters.searchTerm) {
+      const searchLower = filters.searchTerm.toLowerCase();
       filtered = filtered.filter(lawyer => 
-        lawyer.lawyer_id.toLowerCase().includes(filters.searchTerm.toLowerCase()) ||
-        lawyer.branch_name.toLowerCase().includes(filters.searchTerm.toLowerCase())
+        (lawyer.lawyer_name && lawyer.lawyer_name.toLowerCase().includes(searchLower)) ||
+        lawyer.lawyer_id.toLowerCase().includes(searchLower) ||
+        lawyer.branch_name.toLowerCase().includes(searchLower)
       );
     }
 
@@ -119,6 +125,7 @@ export default function Dashboard() {
           onViewChange={setActiveView} 
           activeView={activeView}
           onFilterChange={handleFilterChange}
+          lawyers={lawyers}
         />
         <SidebarInset className="flex-1">
           <main className="p-6 h-full">
