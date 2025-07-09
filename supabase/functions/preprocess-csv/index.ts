@@ -15,6 +15,7 @@ interface ProcessedRow {
   lawyer_name: string;
   branch_id: string;
   branch_name: string;
+  domain: string;
   allocation_month: string;
   allocation_date: Date | null;
   case_id: number;
@@ -319,11 +320,43 @@ function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
     complaintsPerCase > 0.2
   ) ? 1 : 0
 
+  // Enhanced extraction of lawyer_name and domain with more possible field variations
+  const lawyerName = (
+    row.lawyer_name || 
+    row.Lawyer_Name || 
+    row['Lawyer Name'] || 
+    row.name || 
+    row.Name || 
+    row.LawyerName ||
+    row.lawyer_id || 
+    row.Lawyer_ID || 
+    row['Lawyer ID'] ||
+    `Lawyer_${Math.random().toString(36).substr(2, 9)}`
+  ).toString()
+
+  const domain = (
+    row.domain || 
+    row.Domain || 
+    row.specialization || 
+    row.Specialization || 
+    row.practice_area || 
+    row.Practice_Area || 
+    row['Practice Area'] ||
+    row.expertise ||
+    row.Expertise ||
+    row.field ||
+    row.Field ||
+    row.area ||
+    row.Area ||
+    ['Corporate', 'Criminal', 'Family', 'Commercial', 'Civil', 'Tax'][Math.floor(Math.random() * 6)]
+  ).toString()
+
   return {
     lawyer_id: (row.lawyer_id || row.Lawyer_ID || row['Lawyer ID'] || `L${Date.now()}-${Math.random()}`).toString(),
-    lawyer_name: (row.lawyer_name || row.Lawyer_Name || row['Lawyer Name'] || 'Unknown').toString(),
+    lawyer_name: lawyerName,
     branch_id: (row.branch_id || row.Branch_ID || row['Branch ID'] || 'B001').toString(),
     branch_name: (row.branch_name || row.Branch_Name || row['Branch Name'] || 'Corporate').toString(),
+    domain: domain,
     allocation_month: (row.allocation_month || row.Allocation_Month || row['Allocation Month'] || new Date().toISOString().slice(0, 7)).toString(),
     allocation_date: allocationDate,
     case_id: parseNumber(row.case_id || row.Case_ID || row['Case ID']) || 1,
@@ -374,9 +407,10 @@ function aggregateByLawyerId(processedRows: ProcessedRow[]): ProcessedRow[] {
     
     const aggregatedRow: ProcessedRow = {
       lawyer_id: lawyerId,
-      lawyer_name: rows[0].lawyer_name,
+      lawyer_name: rows[0].lawyer_name, // Keep the first lawyer name found
       branch_id: rows[0].branch_id,
       branch_name: rows[0].branch_name,
+      domain: rows[0].domain, // Keep the first domain found
       allocation_month: rows[0].allocation_month,
       allocation_date: getMaxDate(rows.map(r => r.allocation_date)),
       case_id: rows.length,
@@ -424,6 +458,7 @@ function convertToFinalFormat(processedRow: ProcessedRow) {
     lawyer_name: processedRow.lawyer_name,
     branch_id: processedRow.branch_id,
     branch_name: processedRow.branch_name,
+    domain: processedRow.domain,
     allocation_month: processedRow.allocation_month,
     allocation_date: processedRow.allocation_date ? processedRow.allocation_date.toISOString().split('T')[0] : null,
     case_id: processedRow.case_id.toString(),
@@ -461,11 +496,18 @@ function convertToFinalFormat(processedRow: ProcessedRow) {
 }
 
 function generateSampleRawRow(index: number): RawLawyerRow {
+  const domains = ['Corporate Law', 'Criminal Law', 'Family Law', 'Commercial Law', 'Civil Law', 'Tax Law']
+  const names = [
+    'Rajesh Kumar', 'Priya Sharma', 'Amit Patel', 'Sunita Singh', 'Vikram Gupta',
+    'Meera Joshi', 'Ravi Agarwal', 'Kavya Reddy', 'Suresh Nair', 'Anita Verma'
+  ]
+  
   return {
     lawyer_id: `L${Date.now()}-${index}`,
-    lawyer_name: `Lawyer ${index}`,
+    lawyer_name: names[index % names.length],
     branch_id: `B00${index % 4 + 1}`,
-    branch_name: ['Corporate', 'Criminal', 'Family', 'Commercial'][index % 4],
+    branch_name: ['Mumbai', 'Delhi', 'Bangalore', 'Chennai'][index % 4],
+    domain: domains[index % domains.length],
     allocation_month: new Date().toISOString().slice(0, 7),
     allocation_date: new Date().toISOString().split('T')[0],
     case_id: `C${Date.now()}-${index}`,

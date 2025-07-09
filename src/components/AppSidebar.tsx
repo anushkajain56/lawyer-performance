@@ -34,8 +34,7 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange, lawyers }
     searchTerm: '',
     tat_flag: 'all',
     allocation_status: 'all',
-    lawyer_score_range: [0, 1],
-    completion_rate_range: [0, 1]
+    lawyer_score_range: [0, 1]
   });
 
   // Extract unique domains from lawyers data
@@ -189,25 +188,6 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange, lawyers }
                 <div className="flex justify-between text-xs text-muted-foreground mt-1">
                   <span>{(filters.lawyer_score_range[0] * 100).toFixed(0)}%</span>
                   <span>{(filters.lawyer_score_range[1] * 100).toFixed(0)}%</span>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <Label htmlFor="completionRate">Completion Rate Range</Label>
-              <div className="px-2 py-4">
-                <Slider
-                  id="completionRate"
-                  min={0}
-                  max={1}
-                  step={0.01}
-                  value={filters.completion_rate_range}
-                  onValueChange={(value) => handleFilterUpdate('completion_rate_range', value)}
-                  className="w-full"
-                />
-                <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                  <span>{(filters.completion_rate_range[0] * 100).toFixed(0)}%</span>
-                  <span>{(filters.completion_rate_range[1] * 100).toFixed(0)}%</span>
                 </div>
               </div>
             </div>
