@@ -82,7 +82,7 @@ export const useAddLawyers = () => {
           lawyer_name: String(lawyer.lawyer_name || ''), // Ensure string conversion
           branch_id: null,
           branch_name: lawyer.branch_name,
-          domain: String(lawyer.expertise_domains || ''), // Map frontend 'expertise_domains' to database 'domain' // Ensure string conversion and map to domain field
+          expertise_domains: String(lawyer.expertise_domains || ''), // Map frontend 'expertise_domains' to database 'domain' // Ensure string conversion and map to domain field
           allocation_month: lawyer.allocation_month,
           allocation_date: null,
           case_id: lawyer.case_id,
