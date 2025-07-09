@@ -4,7 +4,7 @@ export interface Lawyer {
   lawyer_id: string;
   lawyer_name?: string;
   branch_name: string;
-  domain?: string;
+  expertise_domains?: string; // Changed from domain to expertise_domains
   allocation_month: string;
   case_id: string;
   
@@ -35,7 +35,7 @@ export interface Lawyer {
 
 export interface FilterState {
   branch_name: string;
-  domain: string;
+  expertise_domains: string; // Changed from domain to expertise_domains
   low_performance_flag: boolean;
   searchTerm: string;
   allocation_status: string;

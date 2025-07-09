@@ -33,7 +33,7 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
         (lawyer.lawyer_name && lawyer.lawyer_name.toLowerCase().includes(searchLower)) ||
         lawyer.lawyer_id.toLowerCase().includes(searchLower) ||
         lawyer.branch_name.toLowerCase().includes(searchLower) ||
-        (lawyer.domain && lawyer.domain.toLowerCase().includes(searchLower))
+        (lawyer.expertise_domains && lawyer.expertise_domains.toLowerCase().includes(searchLower))
       );
     })
     .sort((a, b) => {
@@ -58,7 +58,7 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
         </div>
         <div className="w-72">
           <Input
-            placeholder="Search lawyers by name, ID, location, or domain..."
+            placeholder="Search lawyers by name, ID, location, or expertise..."
             value={localSearch}
             onChange={(e) => setLocalSearch(e.target.value)}
           />
@@ -94,9 +94,9 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
-                    onClick={() => handleSort('domain')}
+                    onClick={() => handleSort('expertise_domains')}
                   >
-                    Domain {sortField === 'domain' && (sortDirection === 'asc' ? '↑' : '↓')}
+                    Expertise Domains {sortField === 'expertise_domains' && (sortDirection === 'asc' ? '↑' : '↓')}
                   </TableHead>
                   <TableHead 
                     className="cursor-pointer hover:bg-muted/50"
@@ -125,8 +125,14 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
                     <TableCell>{lawyer.lawyer_id}</TableCell>
                     <TableCell>{lawyer.branch_name}</TableCell>
                     <TableCell>
-                      {lawyer.domain ? (
-                        <Badge variant="outline">{lawyer.domain}</Badge>
+                      {lawyer.expertise_domains ? (
+                        <div className="flex flex-wrap gap-1">
+                          {lawyer.expertise_domains.split(',').map((domain, index) => (
+                            <Badge key={index} variant="outline" className="text-xs">
+                              {domain.trim()}
+                            </Badge>
+                          ))}
+                        </div>
                       ) : (
                         <span className="text-muted-foreground">Not specified</span>
                       )}

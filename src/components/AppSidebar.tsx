@@ -29,7 +29,7 @@ interface AppSidebarProps {
 export function AppSidebar({ onViewChange, activeView, onFilterChange, lawyers }: AppSidebarProps) {
   const [filters, setFilters] = useState({
     branch_name: 'all',
-    domain: 'all',
+    expertise_domains: 'all',
     low_performance_flag: false,
     searchTerm: '',
     tat_flag: 'all',
@@ -44,9 +44,16 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange, lawyers }
 
   useEffect(() => {
     if (lawyers.length > 0) {
-      // Extract unique domains
-      const uniqueDomains = [...new Set(lawyers.map(lawyer => lawyer.domain).filter(Boolean))];
-      setDomains(uniqueDomains);
+      // Extract unique expertise domains (handle comma-separated values)
+      const allDomains = new Set<string>();
+      lawyers.forEach(lawyer => {
+        if (lawyer.expertise_domains) {
+          lawyer.expertise_domains.split(',').forEach(domain => {
+            allDomains.add(domain.trim());
+          });
+        }
+      });
+      setDomains(Array.from(allDomains).filter(Boolean));
 
       // Extract unique branches
       const uniqueBranches = [...new Set(lawyers.map(lawyer => lawyer.branch_name).filter(Boolean))];
@@ -134,13 +141,13 @@ export function AppSidebar({ onViewChange, activeView, onFilterChange, lawyers }
             </div>
 
             <div>
-              <Label htmlFor="domain">Domain</Label>
+              <Label htmlFor="expertise_domains">Expertise Domain</Label>
               <Select 
-                value={filters.domain} 
-                onValueChange={(value) => handleFilterUpdate('domain', value)}
+                value={filters.expertise_domains} 
+                onValueChange={(value) => handleFilterUpdate('expertise_domains', value)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select domain" />
+                  <SelectValue placeholder="Select expertise domain" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Domains</SelectItem>

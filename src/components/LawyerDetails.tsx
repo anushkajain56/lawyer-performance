@@ -38,8 +38,26 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
           Back to Table
         </Button>
         <div>
-          <h1 className="text-3xl font-bold">{lawyer.lawyer_id}</h1>
-          <p className="text-muted-foreground">{lawyer.branch_name} • Allocation Month: {lawyer.allocation_month}</p>
+          <h1 className="text-3xl font-bold">
+            {lawyer.lawyer_name || lawyer.lawyer_id}
+          </h1>
+          <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
+            <span>{lawyer.branch_name}</span>
+            <span>•</span>
+            <span>Allocation Month: {lawyer.allocation_month}</span>
+            {lawyer.expertise_domains && (
+              <>
+                <span>•</span>
+                <div className="flex flex-wrap gap-1">
+                  {lawyer.expertise_domains.split(',').map((domain, index) => (
+                    <Badge key={index} variant="secondary" className="text-xs">
+                      {domain.trim()}
+                    </Badge>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

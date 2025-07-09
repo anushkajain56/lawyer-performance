@@ -356,7 +356,7 @@ function convertToLawyerFormat(processedRow: ProcessedRow): Lawyer {
     lawyer_id: processedRow.lawyer_id,
     lawyer_name: processedRow.lawyer_name, // Use the actual lawyer name from CSV
     branch_name: processedRow.branch_name,
-    domain: processedRow.expertise_domains, // Use expertise_domains as the domain
+    expertise_domains: processedRow.expertise_domains, // Use expertise_domains properly
     allocation_month: processedRow.allocation_month,
     case_id: processedRow.case_id.toString(),
     cases_assigned: processedRow.cases_assigned,

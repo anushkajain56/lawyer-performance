@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { AppSidebar } from "@/components/AppSidebar";
 import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
@@ -39,8 +38,13 @@ export default function Dashboard() {
       filtered = filtered.filter(lawyer => lawyer.branch_name === filters.branch_name);
     }
     
-    if (filters.domain && filters.domain !== 'all') {
-      filtered = filtered.filter(lawyer => lawyer.domain === filters.domain);
+    if (filters.expertise_domains && filters.expertise_domains !== 'all') {
+      filtered = filtered.filter(lawyer => 
+        lawyer.expertise_domains && 
+        lawyer.expertise_domains.split(',').some(domain => 
+          domain.trim() === filters.expertise_domains
+        )
+      );
     }
     
     if (filters.tat_flag && filters.tat_flag !== 'all') {
@@ -62,19 +66,13 @@ export default function Dashboard() {
       );
     }
     
-    if (filters.completion_rate_range) {
-      filtered = filtered.filter(lawyer => 
-        lawyer.completion_rate >= filters.completion_rate_range[0] && 
-        lawyer.completion_rate <= filters.completion_rate_range[1]
-      );
-    }
-    
     if (filters.searchTerm) {
       const searchLower = filters.searchTerm.toLowerCase();
       filtered = filtered.filter(lawyer => 
         (lawyer.lawyer_name && lawyer.lawyer_name.toLowerCase().includes(searchLower)) ||
         lawyer.lawyer_id.toLowerCase().includes(searchLower) ||
-        lawyer.branch_name.toLowerCase().includes(searchLower)
+        lawyer.branch_name.toLowerCase().includes(searchLower) ||
+        (lawyer.expertise_domains && lawyer.expertise_domains.toLowerCase().includes(searchLower))
       );
     }
 
