@@ -1,4 +1,3 @@
-
 import { Lawyer } from '@/types/lawyer';
 
 export interface CSVProcessingResult {
@@ -48,9 +47,58 @@ interface ProcessedRow {
   low_performance_flag: number;
 }
 
+// XGBoost model feature importance weights from your trained model
+const XGBOOST_FEATURE_WEIGHTS = {
+  feedback_flag_encoded: 0.359135,
+  quality_check_flag_encoded: 0.211663,
+  tat_compliance_percent: 0.138505,
+  complaints_per_case: 0.126061,
+  avg_tat_days: 0.063968,
+  reworks_per_case: 0.063401,
+  cases_remaining: 0.013272,
+  low_performance_flag: 0.008766,
+  completion_rate: 0.006925,
+  allocation_status_encoded: 0.004249,
+  allocation_month_num: 0.004054,
+  tat_flag_encoded: 0.000000
+};
+
+function calculateLawyerScore(processedRow: ProcessedRow): number {
+  // Normalize features to 0-1 scale for consistent scoring
+  const normalizedFeatures = {
+    feedback_flag_encoded: processedRow.feedback_flag_encoded, // Already 0-1
+    quality_check_flag_encoded: processedRow.quality_check_flag_encoded, // Already 0-1
+    tat_compliance_percent: Math.min(processedRow.tat_compliance_percent / 100, 1), // Convert to 0-1
+    complaints_per_case: Math.min(processedRow.complaints_per_case, 1), // Cap at 1
+    avg_tat_days: Math.max(0, 1 - (processedRow.avg_tat_days / 30)), // Inverse: lower TAT is better
+    reworks_per_case: Math.min(processedRow.reworks_per_case, 1), // Cap at 1
+    cases_remaining: Math.max(0, 1 - (processedRow.cases_remaining / 100)), // Inverse: fewer remaining is better
+    low_performance_flag: 1 - processedRow.low_performance_flag, // Inverse: no low performance flag is better
+    completion_rate: processedRow.completion_rate, // Already 0-1
+    allocation_status_encoded: processedRow.allocation_status_encoded / 4, // Normalize to 0-1 (max encoded value is 4)
+    allocation_month_num: processedRow.allocation_month_num / 12, // Normalize to 0-1
+    tat_flag_encoded: 1 - processedRow.tat_flag_encoded // Inverse: Green (0) is better than Red (1)
+  };
+
+  // Calculate weighted score using XGBoost feature importance
+  let weightedScore = 0;
+  let totalWeight = 0;
+
+  Object.entries(XGBOOST_FEATURE_WEIGHTS).forEach(([feature, weight]) => {
+    const featureValue = normalizedFeatures[feature as keyof typeof normalizedFeatures];
+    weightedScore += featureValue * weight;
+    totalWeight += weight;
+  });
+
+  // Normalize by total weight and ensure score is between 0 and 1
+  const lawyerScore = totalWeight > 0 ? Math.max(0, Math.min(1, weightedScore / totalWeight)) : 0;
+  
+  return lawyerScore;
+}
+
 export const parseCSVContent = (csvContent: string): CSVProcessingResult => {
   try {
-    console.log('Starting CSV parsing with Python-equivalent feature engineering...');
+    console.log('Starting CSV parsing with XGBoost-based lawyer scoring...');
     
     if (!csvContent || csvContent.trim().length === 0) {
       return { success: false, error: 'CSV file appears to be empty' };
@@ -95,13 +143,13 @@ export const parseCSVContent = (csvContent: string): CSVProcessingResult => {
       }
     }
 
-    // Step 1: Process each row with feature engineering (like your Python code)
+    // Step 1: Process each row with feature engineering
     const processedRows: ProcessedRow[] = rawRows.map(row => processRowWithFeatureEngineering(row));
 
-    // Step 2: Group by lawyer_id and apply aggregation rules (like your Python groupby)
+    // Step 2: Group by lawyer_id and apply aggregation rules
     const aggregatedData = aggregateByLawyerId(processedRows);
 
-    // Step 3: Convert to final Lawyer format
+    // Step 3: Convert to final Lawyer format with XGBoost-based scoring
     const finalData: Lawyer[] = aggregatedData.map(convertToLawyerFormat);
 
     return { success: true, data: finalData };
@@ -115,47 +163,32 @@ export const parseCSVContent = (csvContent: string): CSVProcessingResult => {
 };
 
 function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
-  // Parse basic values with flexible column name handling
   const casesAssigned = parseNumber(row.cases_assigned || row.Cases_Assigned || row['Cases Assigned']) || 0;
   const casesCompleted = parseNumber(row.cases_completed || row.Cases_Completed || row['Cases Completed']) || 0;
   const complaintCount = parseNumber(row.complaint_count || row.Complaint_Count || row['Complaint Count']) || 0;
   const reworkCount = parseNumber(row.rework_count || row.Rework_Count || row['Rework Count']) || 0;
   const tatCompliancePercent = parseNumber(row.tat_compliance_percent || row.TAT_Compliance_Percent || row['TAT Compliance Percent']) || 0;
   
-  // === Feature Engineering (following your Python logic exactly) ===
-  
-  // Completion rate
   const completionRate = casesAssigned > 0 ? casesCompleted / casesAssigned : 0;
-  
-  // Cases remaining
   const casesRemaining = casesAssigned - casesCompleted;
-  
-  // Complaints per case
   const complaintsPerCase = casesAssigned > 0 ? complaintCount / casesAssigned : 0;
-  
-  // Reworks per case
   const reworksPerCase = casesAssigned > 0 ? reworkCount / casesAssigned : 0;
   
-  // TAT flag encoding
   const tatFlag = (row.tat_flag || row.TAT_Flag || row['TAT Flag'] || 'Green').toString();
   const tatFlagEncoded = tatFlag === 'Red' ? 1 : 0;
   
-  // Feedback flag encoding
   const feedbackFlag = (row.feedback_flag || row.Feedback_Flag || row['Feedback Flag'] || 'Positive').toString();
   const feedbackFlagEncoded = feedbackFlag === 'Positive' ? 1 : 0;
   
-  // Quality check flag encoding
   const qualityCheckFlag = (row.quality_check_flag || row.Quality_Check_Flag || row['Quality Check Flag'] || 'Pass').toString();
   const qualityCheckFlagEncoded = qualityCheckFlag === 'Pass' ? 1 : 0;
   
-  // Allocation status encoding
   const allocationStatus = (row.allocation_status || row.Allocation_Status || row['Allocation Status'] || 'Available').toString();
   const statusMapping: { [key: string]: number } = {
     'Available': 0, 'Allocated': 1, 'Pending': 2, 'Busy': 3, 'On Leave': 4
   };
   const allocationStatusEncoded = statusMapping[allocationStatus] || 0;
   
-  // Allocation date and month
   let allocationDate: Date | null = null;
   let allocationMonthNum = 1;
   
@@ -173,7 +206,6 @@ function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
     }
   }
   
-  // Low performance flag (following your Python logic exactly)
   const lowPerformanceFlag = (
     completionRate < 0.5 ||
     tatCompliancePercent < 70 ||
@@ -219,7 +251,6 @@ function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
 }
 
 function aggregateByLawyerId(processedRows: ProcessedRow[]): ProcessedRow[] {
-  // Group by lawyer_id (following your Python groupby logic)
   const groupedData: { [key: string]: ProcessedRow[] } = {};
   
   processedRows.forEach(row => {
@@ -229,7 +260,6 @@ function aggregateByLawyerId(processedRows: ProcessedRow[]): ProcessedRow[] {
     groupedData[row.lawyer_id].push(row);
   });
 
-  // Apply aggregation rules (following your Python agg_rules exactly)
   const aggregated: ProcessedRow[] = [];
   
   Object.keys(groupedData).forEach(lawyerId => {
@@ -237,39 +267,39 @@ function aggregateByLawyerId(processedRows: ProcessedRow[]): ProcessedRow[] {
     
     const aggregatedRow: ProcessedRow = {
       lawyer_id: lawyerId,
-      lawyer_name: rows[0].lawyer_name, // first
-      branch_id: rows[0].branch_id, // first
-      branch_name: rows[0].branch_name, // first
-      allocation_month: rows[0].allocation_month, // first
-      allocation_date: getMaxDate(rows.map(r => r.allocation_date)), // max
-      case_id: rows.length, // count
-      cases_assigned: sum(rows.map(r => r.cases_assigned)), // sum
-      cases_completed: sum(rows.map(r => r.cases_completed)), // sum
-      avg_tat_days: mean(rows.map(r => r.avg_tat_days)), // mean
-      tat_compliance_percent: mean(rows.map(r => r.tat_compliance_percent)), // mean
-      tat_flag: getMode(rows.map(r => r.tat_flag)), // mode
-      tat_bucket: getMode(rows.map(r => r.tat_bucket)), // mode
-      quality_flags: sum(rows.map(r => r.quality_flags)), // sum
-      quality_check_flag: getMode(rows.map(r => r.quality_check_flag)), // mode
-      client_feedback_score: mean(rows.map(r => r.client_feedback_score)), // mean
-      feedback_flag: getMode(rows.map(r => r.feedback_flag)), // mode
-      rework_count: sum(rows.map(r => r.rework_count)), // sum
-      complaint_count: sum(rows.map(r => r.complaint_count)), // sum
-      max_capacity: rows[0].max_capacity, // first
-      blacklist_status: Math.max(...rows.map(r => r.blacklist_status)), // max
-      total_cases_ytd: Math.round(mean(rows.map(r => r.total_cases_ytd))), // mean
-      quality_rating: getMode(rows.map(r => r.quality_rating)), // mode
-      allocation_status: getMode(rows.map(r => r.allocation_status)), // mode
-      completion_rate: mean(rows.map(r => r.completion_rate)), // mean
-      cases_remaining: sum(rows.map(r => r.cases_remaining)), // sum
-      complaints_per_case: mean(rows.map(r => r.complaints_per_case)), // mean
-      reworks_per_case: mean(rows.map(r => r.reworks_per_case)), // mean
-      tat_flag_encoded: Math.round(mean(rows.map(r => r.tat_flag_encoded))), // mean
-      feedback_flag_encoded: Math.round(mean(rows.map(r => r.feedback_flag_encoded))), // mean
-      quality_check_flag_encoded: Math.round(mean(rows.map(r => r.quality_check_flag_encoded))), // mean
-      allocation_status_encoded: Math.round(mean(rows.map(r => r.allocation_status_encoded))), // mean
-      allocation_month_num: rows[0].allocation_month_num, // first
-      low_performance_flag: Math.max(...rows.map(r => r.low_performance_flag)) // max
+      lawyer_name: rows[0].lawyer_name,
+      branch_id: rows[0].branch_id,
+      branch_name: rows[0].branch_name,
+      allocation_month: rows[0].allocation_month,
+      allocation_date: getMaxDate(rows.map(r => r.allocation_date)),
+      case_id: rows.length,
+      cases_assigned: sum(rows.map(r => r.cases_assigned)),
+      cases_completed: sum(rows.map(r => r.cases_completed)),
+      avg_tat_days: mean(rows.map(r => r.avg_tat_days)),
+      tat_compliance_percent: mean(rows.map(r => r.tat_compliance_percent)),
+      tat_flag: getMode(rows.map(r => r.tat_flag)),
+      tat_bucket: getMode(rows.map(r => r.tat_bucket)),
+      quality_flags: sum(rows.map(r => r.quality_flags)),
+      quality_check_flag: getMode(rows.map(r => r.quality_check_flag)),
+      client_feedback_score: mean(rows.map(r => r.client_feedback_score)),
+      feedback_flag: getMode(rows.map(r => r.feedback_flag)),
+      rework_count: sum(rows.map(r => r.rework_count)),
+      complaint_count: sum(rows.map(r => r.complaint_count)),
+      max_capacity: rows[0].max_capacity,
+      blacklist_status: Math.max(...rows.map(r => r.blacklist_status)),
+      total_cases_ytd: Math.round(mean(rows.map(r => r.total_cases_ytd))),
+      quality_rating: getMode(rows.map(r => r.quality_rating)),
+      allocation_status: getMode(rows.map(r => r.allocation_status)),
+      completion_rate: mean(rows.map(r => r.completion_rate)),
+      cases_remaining: sum(rows.map(r => r.cases_remaining)),
+      complaints_per_case: mean(rows.map(r => r.complaints_per_case)),
+      reworks_per_case: mean(rows.map(r => r.reworks_per_case)),
+      tat_flag_encoded: Math.round(mean(rows.map(r => r.tat_flag_encoded))),
+      feedback_flag_encoded: Math.round(mean(rows.map(r => r.feedback_flag_encoded))),
+      quality_check_flag_encoded: Math.round(mean(rows.map(r => r.quality_check_flag_encoded))),
+      allocation_status_encoded: Math.round(mean(rows.map(r => r.allocation_status_encoded))),
+      allocation_month_num: rows[0].allocation_month_num,
+      low_performance_flag: Math.max(...rows.map(r => r.low_performance_flag))
     };
     
     aggregated.push(aggregatedRow);
@@ -279,6 +309,9 @@ function aggregateByLawyerId(processedRows: ProcessedRow[]): ProcessedRow[] {
 }
 
 function convertToLawyerFormat(processedRow: ProcessedRow): Lawyer {
+  // Calculate lawyer score using XGBoost model weights
+  const lawyerScore = calculateLawyerScore(processedRow);
+  
   return {
     lawyer_id: processedRow.lawyer_id,
     branch_name: processedRow.branch_name,
@@ -288,7 +321,7 @@ function convertToLawyerFormat(processedRow: ProcessedRow): Lawyer {
     cases_completed: processedRow.cases_completed,
     completion_rate: Math.round(processedRow.completion_rate * 10000) / 10000,
     cases_remaining: Math.max(0, processedRow.cases_remaining),
-    performance_score: Math.round(processedRow.completion_rate * 10000) / 10000, // Using completion_rate as performance_score
+    performance_score: lawyerScore, // Using XGBoost-calculated score
     tat_compliance_percent: Math.round(processedRow.tat_compliance_percent * 100) / 100,
     avg_tat_days: Math.round(processedRow.avg_tat_days * 100) / 100,
     tat_flag: processedRow.tat_flag as 'Red' | 'Green',
@@ -298,7 +331,7 @@ function convertToLawyerFormat(processedRow: ProcessedRow): Lawyer {
     complaints_per_case: Math.round(processedRow.complaints_per_case * 10000) / 10000,
     reworks_per_case: Math.round(processedRow.reworks_per_case * 10000) / 10000,
     low_performance_flag: processedRow.low_performance_flag === 1,
-    lawyer_score: Math.round(processedRow.completion_rate * 10000) / 10000, // Using completion_rate as lawyer_score
+    lawyer_score: lawyerScore, // Using XGBoost-calculated score
     quality_rating: Math.round(processedRow.client_feedback_score * 100) / 100,
     allocation_status: processedRow.allocation_status as 'Allocated' | 'Available',
     total_cases_ytd: processedRow.total_cases_ytd
@@ -334,7 +367,6 @@ function generateSampleRawRow(index: number): RawLawyerRow {
   };
 }
 
-// Utility functions for aggregation
 function parseNumber(value: any): number {
   if (typeof value === 'number') return value;
   if (typeof value === 'string') {

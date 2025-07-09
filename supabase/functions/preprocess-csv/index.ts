@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
@@ -48,10 +47,58 @@ interface ProcessedRow {
   low_performance_flag: number;
 }
 
+// XGBoost model feature importance weights from your trained model
+const XGBOOST_FEATURE_WEIGHTS = {
+  feedback_flag_encoded: 0.359135,
+  quality_check_flag_encoded: 0.211663,
+  tat_compliance_percent: 0.138505,
+  complaints_per_case: 0.126061,
+  avg_tat_days: 0.063968,
+  reworks_per_case: 0.063401,
+  cases_remaining: 0.013272,
+  low_performance_flag: 0.008766,
+  completion_rate: 0.006925,
+  allocation_status_encoded: 0.004249,
+  allocation_month_num: 0.004054,
+  tat_flag_encoded: 0.000000
+}
+
+function calculateLawyerScore(processedRow: ProcessedRow): number {
+  // Normalize features to 0-1 scale for consistent scoring
+  const normalizedFeatures = {
+    feedback_flag_encoded: processedRow.feedback_flag_encoded, // Already 0-1
+    quality_check_flag_encoded: processedRow.quality_check_flag_encoded, // Already 0-1
+    tat_compliance_percent: Math.min(processedRow.tat_compliance_percent / 100, 1), // Convert to 0-1
+    complaints_per_case: Math.min(processedRow.complaints_per_case, 1), // Cap at 1
+    avg_tat_days: Math.max(0, 1 - (processedRow.avg_tat_days / 30)), // Inverse: lower TAT is better
+    reworks_per_case: Math.min(processedRow.reworks_per_case, 1), // Cap at 1
+    cases_remaining: Math.max(0, 1 - (processedRow.cases_remaining / 100)), // Inverse: fewer remaining is better
+    low_performance_flag: 1 - processedRow.low_performance_flag, // Inverse: no low performance flag is better
+    completion_rate: processedRow.completion_rate, // Already 0-1
+    allocation_status_encoded: processedRow.allocation_status_encoded / 4, // Normalize to 0-1 (max encoded value is 4)
+    allocation_month_num: processedRow.allocation_month_num / 12, // Normalize to 0-1
+    tat_flag_encoded: 1 - processedRow.tat_flag_encoded // Inverse: Green (0) is better than Red (1)
+  }
+
+  // Calculate weighted score using XGBoost feature importance
+  let weightedScore = 0
+  let totalWeight = 0
+
+  Object.entries(XGBOOST_FEATURE_WEIGHTS).forEach(([feature, weight]) => {
+    const featureValue = normalizedFeatures[feature as keyof typeof normalizedFeatures]
+    weightedScore += featureValue * weight
+    totalWeight += weight
+  })
+
+  // Normalize by total weight and ensure score is between 0 and 1
+  const lawyerScore = totalWeight > 0 ? Math.max(0, Math.min(1, weightedScore / totalWeight)) : 0
+  
+  return lawyerScore
+}
+
 serve(async (req) => {
   console.log('Edge Function called with method:', req.method)
   
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
@@ -68,7 +115,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('Processing CSV file with Python-equivalent Feature Engineering...')
+    console.log('Processing CSV file with XGBoost-based lawyer scoring...')
 
     let file: File;
     let csvContent: string;
@@ -189,10 +236,10 @@ serve(async (req) => {
     // Step 2: Group by lawyer_id and apply aggregation rules
     const aggregatedData = aggregateByLawyerId(processedRows)
     
-    // Step 3: Convert to final format
+    // Step 3: Convert to final format with XGBoost-based scoring
     const finalData = aggregatedData.map(convertToFinalFormat)
 
-    console.log('Successfully processed', finalData.length, 'records with Python-equivalent feature engineering')
+    console.log('Successfully processed', finalData.length, 'records with XGBoost-based lawyer scoring')
 
     return new Response(
       JSON.stringify(finalData),
@@ -223,14 +270,12 @@ serve(async (req) => {
 })
 
 function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
-  // Parse basic values with flexible column name handling
   const casesAssigned = parseNumber(row.cases_assigned || row.Cases_Assigned || row['Cases Assigned']) || 0
   const casesCompleted = parseNumber(row.cases_completed || row.Cases_Completed || row['Cases Completed']) || 0
   const complaintCount = parseNumber(row.complaint_count || row.Complaint_Count || row['Complaint Count']) || 0
   const reworkCount = parseNumber(row.rework_count || row.Rework_Count || row['Rework Count']) || 0
   const tatCompliancePercent = parseNumber(row.tat_compliance_percent || row.TAT_Compliance_Percent || row['TAT Compliance Percent']) || 0
   
-  // === Feature Engineering (following Python logic exactly) ===
   const completionRate = casesAssigned > 0 ? casesCompleted / casesAssigned : 0
   const casesRemaining = casesAssigned - casesCompleted
   const complaintsPerCase = casesAssigned > 0 ? complaintCount / casesAssigned : 0
@@ -371,6 +416,9 @@ function aggregateByLawyerId(processedRows: ProcessedRow[]): ProcessedRow[] {
 }
 
 function convertToFinalFormat(processedRow: ProcessedRow) {
+  // Calculate lawyer score using XGBoost model weights
+  const lawyerScore = calculateLawyerScore(processedRow)
+  
   return {
     lawyer_id: processedRow.lawyer_id,
     lawyer_name: processedRow.lawyer_name,
@@ -406,8 +454,8 @@ function convertToFinalFormat(processedRow: ProcessedRow) {
     allocation_status_encoded: processedRow.allocation_status_encoded,
     allocation_month_num: processedRow.allocation_month_num,
     low_performance_flag: processedRow.low_performance_flag === 1,
-    performance_score: Math.round(processedRow.completion_rate * 10000) / 10000,
-    lawyer_score: Math.round(processedRow.completion_rate * 10000) / 10000,
+    performance_score: lawyerScore, // Using XGBoost-calculated score
+    lawyer_score: lawyerScore, // Using XGBoost-calculated score
     quality_rating_score: Math.round(processedRow.client_feedback_score * 100) / 100
   }
 }
@@ -441,7 +489,6 @@ function generateSampleRawRow(index: number): RawLawyerRow {
   }
 }
 
-// Utility functions
 function parseNumber(value: any): number {
   if (typeof value === 'number') return value
   if (typeof value === 'string') {
