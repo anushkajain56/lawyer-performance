@@ -7,6 +7,47 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+interface RawLawyerRow {
+  [key: string]: string | number;
+}
+
+interface ProcessedRow {
+  lawyer_id: string;
+  lawyer_name: string;
+  branch_id: string;
+  branch_name: string;
+  allocation_month: string;
+  allocation_date: Date | null;
+  case_id: number;
+  cases_assigned: number;
+  cases_completed: number;
+  avg_tat_days: number;
+  tat_compliance_percent: number;
+  tat_flag: string;
+  tat_bucket: string;
+  quality_flags: number;
+  quality_check_flag: string;
+  client_feedback_score: number;
+  feedback_flag: string;
+  rework_count: number;
+  complaint_count: number;
+  max_capacity: number;
+  blacklist_status: number;
+  total_cases_ytd: number;
+  quality_rating: string;
+  allocation_status: string;
+  completion_rate: number;
+  cases_remaining: number;
+  complaints_per_case: number;
+  reworks_per_case: number;
+  tat_flag_encoded: number;
+  feedback_flag_encoded: number;
+  quality_check_flag_encoded: number;
+  allocation_status_encoded: number;
+  allocation_month_num: number;
+  low_performance_flag: number;
+}
+
 serve(async (req) => {
   console.log('Edge Function called with method:', req.method)
   
@@ -27,13 +68,12 @@ serve(async (req) => {
       )
     }
 
-    console.log('Processing CSV file with Feature Engineering...')
+    console.log('Processing CSV file with Python-equivalent Feature Engineering...')
 
     let file: File;
     let csvContent: string;
 
     try {
-      // Parse form data to get the uploaded file
       const formData = await req.formData()
       const uploadedFile = formData.get('file')
       
@@ -50,8 +90,6 @@ serve(async (req) => {
 
       file = uploadedFile as File
       console.log('File received:', file.name, 'Size:', file.size, 'Type:', file.type)
-
-      // Read CSV content with error handling
       csvContent = await file.text()
       console.log('CSV content length:', csvContent.length)
       
@@ -77,7 +115,6 @@ serve(async (req) => {
       )
     }
 
-    // Parse CSV with comprehensive error handling
     let lines: string[]
     let headers: string[]
     let separator: string
@@ -95,7 +132,6 @@ serve(async (req) => {
         )
       }
 
-      // Parse headers - handle both comma and semicolon separators
       separator = ','
       if (lines[0].includes(';') && !lines[0].includes(',')) {
         separator = ';'
@@ -115,57 +151,51 @@ serve(async (req) => {
       )
     }
     
-    const processedData = []
+    const rawRows: RawLawyerRow[] = []
     
-    // If we only have headers, generate sample data
     if (lines.length === 1) {
       console.log('Only headers found, generating sample data')
-      for (let i = 0; i < 5; i++) {
-        const sampleRow = generateSampleLawyer(i + 1)
-        processedData.push(sampleRow)
+      for (let i = 0; i < 10; i++) {
+        const sampleRow = generateSampleRawRow(i + 1)
+        rawRows.push(sampleRow)
       }
     } else {
-      // Process actual data rows with feature engineering
       let successfulRows = 0
       let failedRows = 0
       
       for (let i = 1; i < lines.length; i++) {
         try {
           const values = lines[i].split(separator).map(v => v.trim().replace(/["']/g, ''))
-          const row: any = {}
+          const row: RawLawyerRow = {}
           
-          // Map CSV values to row object
           headers.forEach((header, index) => {
             row[header] = values[index] || ''
           })
 
-          const processedLawyer = processLawyerDataWithFeatureEngineering(row, i)
-          processedData.push(processedLawyer)
+          rawRows.push(row)
           successfulRows++
         } catch (rowError) {
           console.error(`Error processing row ${i}:`, rowError, 'Row data:', lines[i])
           failedRows++
-          // Continue processing other rows instead of failing completely
         }
       }
       
-      console.log(`Processing complete: ${successfulRows} successful, ${failedRows} failed`)
-      
-      if (processedData.length === 0) {
-        return new Response(
-          JSON.stringify({ error: 'No valid data rows could be processed from the CSV file' }), 
-          { 
-            status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        )
-      }
+      console.log(`Raw parsing complete: ${successfulRows} successful, ${failedRows} failed`)
     }
 
-    console.log('Successfully processed', processedData.length, 'records with feature engineering')
+    // Step 1: Process each row with feature engineering
+    const processedRows: ProcessedRow[] = rawRows.map(row => processRowWithFeatureEngineering(row))
+    
+    // Step 2: Group by lawyer_id and apply aggregation rules
+    const aggregatedData = aggregateByLawyerId(processedRows)
+    
+    // Step 3: Convert to final format
+    const finalData = aggregatedData.map(convertToFinalFormat)
+
+    console.log('Successfully processed', finalData.length, 'records with Python-equivalent feature engineering')
 
     return new Response(
-      JSON.stringify(processedData),
+      JSON.stringify(finalData),
       { 
         headers: { 
           ...corsHeaders, 
@@ -192,180 +222,268 @@ serve(async (req) => {
   }
 })
 
-function processLawyerDataWithFeatureEngineering(row: any, index: number) {
-  // Parse base numeric values
-  const casesAssigned = parseInt(row.cases_assigned) || 0
-  const casesCompleted = parseInt(row.cases_completed) || 0
-  const complaintCount = parseInt(row.complaint_count) || 0
-  const reworkCount = parseInt(row.rework_count) || 0
-  const tatCompliancePercent = parseFloat(row.tat_compliance_percent) || 0
+function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
+  // Parse basic values with flexible column name handling
+  const casesAssigned = parseNumber(row.cases_assigned || row.Cases_Assigned || row['Cases Assigned']) || 0
+  const casesCompleted = parseNumber(row.cases_completed || row.Cases_Completed || row['Cases Completed']) || 0
+  const complaintCount = parseNumber(row.complaint_count || row.Complaint_Count || row['Complaint Count']) || 0
+  const reworkCount = parseNumber(row.rework_count || row.Rework_Count || row['Rework Count']) || 0
+  const tatCompliancePercent = parseNumber(row.tat_compliance_percent || row.TAT_Compliance_Percent || row['TAT Compliance Percent']) || 0
   
-  // === Feature Engineering (following the Python logic) ===
-  
-  // 1. Completion rate
+  // === Feature Engineering (following Python logic exactly) ===
   const completionRate = casesAssigned > 0 ? casesCompleted / casesAssigned : 0
-  
-  // 2. Cases remaining
-  const casesRemaining = Math.max(0, casesAssigned - casesCompleted)
-  
-  // 3. Complaints per case
+  const casesRemaining = casesAssigned - casesCompleted
   const complaintsPerCase = casesAssigned > 0 ? complaintCount / casesAssigned : 0
-  
-  // 4. Reworks per case
   const reworksPerCase = casesAssigned > 0 ? reworkCount / casesAssigned : 0
   
-  // 5. TAT flag encoded (Red = 1, Green = 0)
-  const tatFlag = row.tat_flag || (parseFloat(row.avg_tat_days) > 15 ? 'Red' : 'Green')
+  const tatFlag = (row.tat_flag || row.TAT_Flag || row['TAT Flag'] || 'Green').toString()
   const tatFlagEncoded = tatFlag === 'Red' ? 1 : 0
   
-  // 6. Feedback flag encoded (Positive = 1, Neutral/Negative = 0)
-  const feedbackFlag = row.feedback_flag || 'Positive'
+  const feedbackFlag = (row.feedback_flag || row.Feedback_Flag || row['Feedback Flag'] || 'Positive').toString()
   const feedbackFlagEncoded = feedbackFlag === 'Positive' ? 1 : 0
   
-  // 7. Quality check flag encoded (Pass = 1, Fail = 0)
-  const qualityCheckFlag = row.quality_check_flag || 'Pass'
+  const qualityCheckFlag = (row.quality_check_flag || row.Quality_Check_Flag || row['Quality Check Flag'] || 'Pass').toString()
   const qualityCheckFlagEncoded = qualityCheckFlag === 'Pass' ? 1 : 0
   
-  // 8. Allocation status encoded (category codes)
-  const allocationStatus = row.allocation_status || 'Available'
+  const allocationStatus = (row.allocation_status || row.Allocation_Status || row['Allocation Status'] || 'Available').toString()
   const statusMapping: { [key: string]: number } = {
     'Available': 0, 'Allocated': 1, 'Pending': 2, 'Busy': 3, 'On Leave': 4
   }
   const allocationStatusEncoded = statusMapping[allocationStatus] || 0
   
-  // 9. Allocation month number (from date)
+  let allocationDate: Date | null = null
   let allocationMonthNum = 1
-  if (row.allocation_date) {
+  
+  const dateStr = row.allocation_date || row.Allocation_Date || row['Allocation Date']
+  if (dateStr) {
     try {
-      const date = new Date(row.allocation_date)
-      if (!isNaN(date.getTime())) {
-        allocationMonthNum = date.getMonth() + 1
+      allocationDate = new Date(dateStr.toString())
+      if (!isNaN(allocationDate.getTime())) {
+        allocationMonthNum = allocationDate.getMonth() + 1
+      } else {
+        allocationDate = null
       }
     } catch (e) {
-      console.log('Error parsing allocation_date:', row.allocation_date)
+      console.log('Error parsing allocation_date:', dateStr)
     }
   }
   
-  // 10. Low performance flag
   const lowPerformanceFlag = (
     completionRate < 0.5 ||
     tatCompliancePercent < 70 ||
     complaintsPerCase > 0.2
   ) ? 1 : 0
-  
-  // Calculate additional metrics
-  const clientFeedbackScore = parseFloat(row.client_feedback_score) || Math.random() * 2 + 3
-  const avgTatDays = parseFloat(row.avg_tat_days) || Math.random() * 20 + 5
-  
-  // Calculate lawyer score (weighted performance metric)
-  const lawyerScore = Math.min(1, Math.max(0, 
-    completionRate * 0.4 + 
-    (tatCompliancePercent / 100) * 0.3 + 
-    (clientFeedbackScore / 5) * 0.3
-  ))
 
-  // Process allocation month string
-  let allocationMonth = row.allocation_month
-  if (row.allocation_date && !allocationMonth) {
-    try {
-      const date = new Date(row.allocation_date)
-      if (!isNaN(date.getTime())) {
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-        allocationMonth = `${months[date.getMonth()]}-${date.getFullYear()}`
-      }
-    } catch (e) {
-      console.log('Error creating allocation_month:', row.allocation_date)
-    }
-  }
-  if (!allocationMonth) {
-    const now = new Date()
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-    allocationMonth = `${months[now.getMonth()]}-${now.getFullYear()}`
-  }
-
-  // Create the final processed lawyer object with all engineered features
   return {
-    // Basic Info
-    lawyer_id: row.lawyer_id || `L${Date.now()}-${index}`,
-    branch_name: row.branch_name || 'Corporate',
-    allocation_month: allocationMonth,
-    case_id: row.case_id || `C${Date.now()}-${index}`,
-    
-    // Core Performance Metrics
+    lawyer_id: (row.lawyer_id || row.Lawyer_ID || row['Lawyer ID'] || `L${Date.now()}-${Math.random()}`).toString(),
+    lawyer_name: (row.lawyer_name || row.Lawyer_Name || row['Lawyer Name'] || 'Unknown').toString(),
+    branch_id: (row.branch_id || row.Branch_ID || row['Branch ID'] || 'B001').toString(),
+    branch_name: (row.branch_name || row.Branch_Name || row['Branch Name'] || 'Corporate').toString(),
+    allocation_month: (row.allocation_month || row.Allocation_Month || row['Allocation Month'] || new Date().toISOString().slice(0, 7)).toString(),
+    allocation_date: allocationDate,
+    case_id: parseNumber(row.case_id || row.Case_ID || row['Case ID']) || 1,
     cases_assigned: casesAssigned,
     cases_completed: casesCompleted,
-    completion_rate: Math.round(completionRate * 10000) / 10000,
-    cases_remaining: casesRemaining,
-    performance_score: Math.round(lawyerScore * 10000) / 10000,
-    tat_compliance_percent: Math.round(tatCompliancePercent * 100) / 100,
-    avg_tat_days: Math.round(avgTatDays * 100) / 100,
-    
-    // Flags and Indicators
+    avg_tat_days: parseNumber(row.avg_tat_days || row.Avg_TAT_Days || row['Avg TAT Days']) || 0,
+    tat_compliance_percent: tatCompliancePercent,
     tat_flag: tatFlag,
-    quality_check_flag: qualityCheckFlagEncoded === 1,
-    client_feedback_score: Math.round(clientFeedbackScore * 100) / 100,
-    feedback_flag: feedbackFlagEncoded === 1,
-    complaints_per_case: Math.round(complaintsPerCase * 10000) / 10000,
-    reworks_per_case: Math.round(reworksPerCase * 10000) / 10000,
-    low_performance_flag: lowPerformanceFlag === 1,
-    
-    // Summary Metrics
-    lawyer_score: Math.round(lawyerScore * 10000) / 10000,
-    quality_rating: Math.round(clientFeedbackScore * 100) / 100,
+    tat_bucket: (row.tat_bucket || row.TAT_Bucket || row['TAT Bucket'] || 'Normal').toString(),
+    quality_flags: parseNumber(row.quality_flags || row.Quality_Flags || row['Quality Flags']) || 0,
+    quality_check_flag: qualityCheckFlag,
+    client_feedback_score: parseNumber(row.client_feedback_score || row.Client_Feedback_Score || row['Client Feedback Score']) || 4.0,
+    feedback_flag: feedbackFlag,
+    rework_count: reworkCount,
+    complaint_count: complaintCount,
+    max_capacity: parseNumber(row.max_capacity || row.Max_Capacity || row['Max Capacity']) || 50,
+    blacklist_status: parseNumber(row.blacklist_status || row.Blacklist_Status || row['Blacklist Status']) || 0,
+    total_cases_ytd: parseNumber(row.total_cases_ytd || row.Total_Cases_YTD || row['Total Cases YTD']) || casesAssigned,
+    quality_rating: (row.quality_rating || row.Quality_Rating || row['Quality Rating'] || 'Good').toString(),
     allocation_status: allocationStatus,
-    total_cases_ytd: parseInt(row.total_cases_ytd) || casesAssigned * (3 + Math.floor(Math.random() * 3))
+    completion_rate: completionRate,
+    cases_remaining: casesRemaining,
+    complaints_per_case: complaintsPerCase,
+    reworks_per_case: reworksPerCase,
+    tat_flag_encoded: tatFlagEncoded,
+    feedback_flag_encoded: feedbackFlagEncoded,
+    quality_check_flag_encoded: qualityCheckFlagEncoded,
+    allocation_status_encoded: allocationStatusEncoded,
+    allocation_month_num: allocationMonthNum,
+    low_performance_flag: lowPerformanceFlag
   }
 }
 
-function generateSampleLawyer(index: number) {
-  const casesAssigned = Math.floor(Math.random() * 50) + 10
-  const casesCompleted = Math.floor(casesAssigned * (0.6 + Math.random() * 0.3))
-  const completionRate = casesAssigned > 0 ? casesCompleted / casesAssigned : Math.random() * 0.4 + 0.6
-  const casesRemaining = casesAssigned - casesCompleted
+function aggregateByLawyerId(processedRows: ProcessedRow[]): ProcessedRow[] {
+  const groupedData: { [key: string]: ProcessedRow[] } = {}
   
-  const tatCompliance = Math.random() * 0.4 + 0.6
-  const clientFeedback = Math.random() * 2 + 3
-  const avgTatDays = Math.random() * 20 + 5
+  processedRows.forEach(row => {
+    if (!groupedData[row.lawyer_id]) {
+      groupedData[row.lawyer_id] = []
+    }
+    groupedData[row.lawyer_id].push(row)
+  })
+
+  const aggregated: ProcessedRow[] = []
   
-  const complaintsPerCase = Math.random() * 0.2
-  const reworksPerCase = Math.random() * 0.3
-  
-  const tatFlag = avgTatDays > 15 ? 'Red' : 'Green'
-  const feedbackFlag = clientFeedback < 3.5
-  const qualityCheckFlag = clientFeedback >= 4.0
-  const lowPerformanceFlag = completionRate < 0.7 || tatCompliance < 0.75 || clientFeedback < 3.5
-  
-  const lawyerScore = Math.min(1, Math.max(0, 
-    completionRate * 0.4 + 
-    tatCompliance * 0.3 + 
-    (clientFeedback / 5) * 0.3
-  ))
-  
-  const branches = ['Corporate', 'Criminal', 'Family', 'Commercial']
-  const statuses = ['Available', 'Allocated']
-  
+  Object.keys(groupedData).forEach(lawyerId => {
+    const rows = groupedData[lawyerId]
+    
+    const aggregatedRow: ProcessedRow = {
+      lawyer_id: lawyerId,
+      lawyer_name: rows[0].lawyer_name,
+      branch_id: rows[0].branch_id,
+      branch_name: rows[0].branch_name,
+      allocation_month: rows[0].allocation_month,
+      allocation_date: getMaxDate(rows.map(r => r.allocation_date)),
+      case_id: rows.length,
+      cases_assigned: sum(rows.map(r => r.cases_assigned)),
+      cases_completed: sum(rows.map(r => r.cases_completed)),
+      avg_tat_days: mean(rows.map(r => r.avg_tat_days)),
+      tat_compliance_percent: mean(rows.map(r => r.tat_compliance_percent)),
+      tat_flag: getMode(rows.map(r => r.tat_flag)),
+      tat_bucket: getMode(rows.map(r => r.tat_bucket)),
+      quality_flags: sum(rows.map(r => r.quality_flags)),
+      quality_check_flag: getMode(rows.map(r => r.quality_check_flag)),
+      client_feedback_score: mean(rows.map(r => r.client_feedback_score)),
+      feedback_flag: getMode(rows.map(r => r.feedback_flag)),
+      rework_count: sum(rows.map(r => r.rework_count)),
+      complaint_count: sum(rows.map(r => r.complaint_count)),
+      max_capacity: rows[0].max_capacity,
+      blacklist_status: Math.max(...rows.map(r => r.blacklist_status)),
+      total_cases_ytd: Math.round(mean(rows.map(r => r.total_cases_ytd))),
+      quality_rating: getMode(rows.map(r => r.quality_rating)),
+      allocation_status: getMode(rows.map(r => r.allocation_status)),
+      completion_rate: mean(rows.map(r => r.completion_rate)),
+      cases_remaining: sum(rows.map(r => r.cases_remaining)),
+      complaints_per_case: mean(rows.map(r => r.complaints_per_case)),
+      reworks_per_case: mean(rows.map(r => r.reworks_per_case)),
+      tat_flag_encoded: Math.round(mean(rows.map(r => r.tat_flag_encoded))),
+      feedback_flag_encoded: Math.round(mean(rows.map(r => r.feedback_flag_encoded))),
+      quality_check_flag_encoded: Math.round(mean(rows.map(r => r.quality_check_flag_encoded))),
+      allocation_status_encoded: Math.round(mean(rows.map(r => r.allocation_status_encoded))),
+      allocation_month_num: rows[0].allocation_month_num,
+      low_performance_flag: Math.max(...rows.map(r => r.low_performance_flag))
+    }
+    
+    aggregated.push(aggregatedRow)
+  })
+
+  return aggregated
+}
+
+function convertToFinalFormat(processedRow: ProcessedRow) {
+  return {
+    lawyer_id: processedRow.lawyer_id,
+    lawyer_name: processedRow.lawyer_name,
+    branch_id: processedRow.branch_id,
+    branch_name: processedRow.branch_name,
+    allocation_month: processedRow.allocation_month,
+    allocation_date: processedRow.allocation_date ? processedRow.allocation_date.toISOString().split('T')[0] : null,
+    case_id: processedRow.case_id.toString(),
+    cases_assigned: processedRow.cases_assigned,
+    cases_completed: processedRow.cases_completed,
+    avg_tat_days: Math.round(processedRow.avg_tat_days * 100) / 100,
+    tat_compliance_percent: Math.round(processedRow.tat_compliance_percent * 100) / 100,
+    tat_flag: processedRow.tat_flag,
+    tat_bucket: processedRow.tat_bucket,
+    quality_flags: processedRow.quality_flags,
+    quality_check_flag: processedRow.quality_check_flag,
+    client_feedback_score: Math.round(processedRow.client_feedback_score * 100) / 100,
+    feedback_flag: processedRow.feedback_flag,
+    rework_count: processedRow.rework_count,
+    complaint_count: processedRow.complaint_count,
+    max_capacity: processedRow.max_capacity,
+    blacklist_status: processedRow.blacklist_status === 1,
+    total_cases_ytd: processedRow.total_cases_ytd,
+    quality_rating: processedRow.quality_rating,
+    allocation_status: processedRow.allocation_status,
+    completion_rate: Math.round(processedRow.completion_rate * 10000) / 10000,
+    cases_remaining: Math.max(0, processedRow.cases_remaining),
+    complaints_per_case: Math.round(processedRow.complaints_per_case * 10000) / 10000,
+    reworks_per_case: Math.round(processedRow.reworks_per_case * 10000) / 10000,
+    tat_flag_encoded: processedRow.tat_flag_encoded,
+    feedback_flag_encoded: processedRow.feedback_flag_encoded,
+    quality_check_flag_encoded: processedRow.quality_check_flag_encoded,
+    allocation_status_encoded: processedRow.allocation_status_encoded,
+    allocation_month_num: processedRow.allocation_month_num,
+    low_performance_flag: processedRow.low_performance_flag === 1,
+    performance_score: Math.round(processedRow.completion_rate * 10000) / 10000,
+    lawyer_score: Math.round(processedRow.completion_rate * 10000) / 10000,
+    quality_rating_score: Math.round(processedRow.client_feedback_score * 100) / 100
+  }
+}
+
+function generateSampleRawRow(index: number): RawLawyerRow {
   return {
     lawyer_id: `L${Date.now()}-${index}`,
-    branch_name: branches[Math.floor(Math.random() * branches.length)],
+    lawyer_name: `Lawyer ${index}`,
+    branch_id: `B00${index % 4 + 1}`,
+    branch_name: ['Corporate', 'Criminal', 'Family', 'Commercial'][index % 4],
     allocation_month: new Date().toISOString().slice(0, 7),
+    allocation_date: new Date().toISOString().split('T')[0],
     case_id: `C${Date.now()}-${index}`,
-    cases_assigned: casesAssigned,
-    cases_completed: casesCompleted,
-    completion_rate: Math.round(completionRate * 10000) / 10000,
-    cases_remaining: Math.max(0, casesRemaining),
-    performance_score: Math.round(lawyerScore * 10000) / 10000,
-    tat_compliance_percent: Math.round(tatCompliance * 10000) / 10000,
-    avg_tat_days: Math.round(avgTatDays * 100) / 100,
-    tat_flag: tatFlag,
-    quality_check_flag: qualityCheckFlag,
-    client_feedback_score: Math.round(clientFeedback * 100) / 100,
-    feedback_flag: feedbackFlag,
-    complaints_per_case: Math.round(complaintsPerCase * 10000) / 10000,
-    reworks_per_case: Math.round(reworksPerCase * 10000) / 10000,
-    low_performance_flag: lowPerformanceFlag,
-    lawyer_score: Math.round(lawyerScore * 10000) / 10000,
-    quality_rating: Math.round(clientFeedback * 100) / 100,
-    allocation_status: statuses[Math.floor(Math.random() * statuses.length)],
-    total_cases_ytd: casesAssigned * (3 + Math.floor(Math.random() * 3))
+    cases_assigned: Math.floor(Math.random() * 50) + 10,
+    cases_completed: Math.floor(Math.random() * 40) + 5,
+    avg_tat_days: Math.random() * 20 + 5,
+    tat_compliance_percent: Math.random() * 40 + 60,
+    tat_flag: Math.random() > 0.7 ? 'Red' : 'Green',
+    tat_bucket: 'Normal',
+    quality_flags: Math.floor(Math.random() * 3),
+    quality_check_flag: Math.random() > 0.2 ? 'Pass' : 'Fail',
+    client_feedback_score: Math.random() * 2 + 3,
+    feedback_flag: Math.random() > 0.3 ? 'Positive' : 'Neutral/Negative',
+    rework_count: Math.floor(Math.random() * 5),
+    complaint_count: Math.floor(Math.random() * 3),
+    max_capacity: 50,
+    blacklist_status: 0,
+    total_cases_ytd: Math.floor(Math.random() * 200) + 100,
+    quality_rating: 'Good',
+    allocation_status: Math.random() > 0.5 ? 'Allocated' : 'Available'
   }
+}
+
+// Utility functions
+function parseNumber(value: any): number {
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') {
+    const parsed = parseFloat(value)
+    return isNaN(parsed) ? 0 : parsed
+  }
+  return 0
+}
+
+function sum(values: number[]): number {
+  return values.reduce((a, b) => a + b, 0)
+}
+
+function mean(values: number[]): number {
+  return values.length > 0 ? sum(values) / values.length : 0
+}
+
+function getMode<T>(values: T[]): T {
+  const frequency: { [key: string]: number } = {}
+  values.forEach(val => {
+    const key = String(val)
+    frequency[key] = (frequency[key] || 0) + 1
+  })
+  
+  let maxFreq = 0
+  let mode = values[0]
+  
+  Object.keys(frequency).forEach(key => {
+    if (frequency[key] > maxFreq) {
+      maxFreq = frequency[key]
+      mode = values.find(v => String(v) === key) || values[0]
+    }
+  })
+  
+  return mode
+}
+
+function getMaxDate(dates: (Date | null)[]): Date | null {
+  const validDates = dates.filter(d => d !== null) as Date[]
+  if (validDates.length === 0) return null
+  
+  return validDates.reduce((max, current) => {
+    return current > max ? current : max
+  })
 }
