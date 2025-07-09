@@ -75,14 +75,14 @@ export const useAddLawyers = () => {
       console.log('Attempting to insert lawyers:', lawyers.length);
       console.log('First lawyer sample before insert:', lawyers[0]);
       
-      const { data, error } = await supabase
+        const { data, error } = await supabase
         .from('lawyers')
         .insert(lawyers.map(lawyer => ({
           lawyer_id: lawyer.lawyer_id,
-          lawyer_name: lawyer.lawyer_name || null,
+          lawyer_name: String(lawyer.lawyer_name || ''), // Ensure string conversion
           branch_id: null,
           branch_name: lawyer.branch_name,
-          domain: lawyer.expertise_domains || null, // Map expertise_domains to domain field for database
+          domain: String(lawyer.expertise_domains || ''), // Ensure string conversion and map to domain field
           allocation_month: lawyer.allocation_month,
           allocation_date: null,
           case_id: lawyer.case_id,
