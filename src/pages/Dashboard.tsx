@@ -77,10 +77,16 @@ export default function Dashboard() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Loading lawyer data...</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-muted/20">
+        <div className="text-center p-8 rounded-2xl bg-card/50 backdrop-blur-sm border shadow-2xl">
+          <div className="relative mb-6">
+            <div className="w-16 h-16 mx-auto rounded-full bg-primary/10 flex items-center justify-center">
+              <div className="w-8 h-8 border-3 border-primary border-t-transparent rounded-full animate-spin"></div>
+            </div>
+            <div className="absolute inset-0 w-16 h-16 mx-auto rounded-full bg-primary/5 animate-pulse"></div>
+          </div>
+          <h3 className="text-xl font-semibold text-foreground mb-2">Loading Dashboard</h3>
+          <p className="text-muted-foreground">Fetching lawyer data...</p>
         </div>
       </div>
     );
@@ -88,14 +94,18 @@ export default function Dashboard() {
 
   if (error) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-red-600 mb-4">Error loading data: {error.message}</p>
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-destructive/5">
+        <div className="text-center p-8 rounded-2xl bg-card/50 backdrop-blur-sm border border-destructive/20 shadow-2xl">
+          <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-destructive/10 flex items-center justify-center">
+            <div className="w-8 h-8 text-destructive">⚠</div>
+          </div>
+          <h3 className="text-xl font-semibold text-destructive mb-2">Connection Error</h3>
+          <p className="text-muted-foreground mb-6">Error loading data: {error.message}</p>
           <button 
             onClick={() => window.location.reload()} 
-            className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+            className="px-6 py-3 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-all duration-200 shadow-md hover:shadow-lg"
           >
-            Retry
+            Try Again
           </button>
         </div>
       </div>
@@ -104,7 +114,7 @@ export default function Dashboard() {
 
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-muted/10">
         <AppSidebar 
           onViewChange={setActiveView} 
           activeView={activeView}
@@ -112,27 +122,29 @@ export default function Dashboard() {
         />
         <SidebarInset className="flex-1">
           <main className="p-6 h-full">
-            {activeView === 'overview' && (
-              <DashboardOverview lawyers={filteredLawyers.length > 0 ? filteredLawyers : lawyers} />
-            )}
-            
-            {activeView === 'table' && !selectedLawyer && (
-              <LawyerTable 
-                lawyers={filteredLawyers.length > 0 ? filteredLawyers : lawyers} 
-                onLawyerSelect={handleLawyerSelect}
-              />
-            )}
-            
-            {activeView === 'table' && selectedLawyer && (
-              <LawyerDetails 
-                lawyer={selectedLawyer} 
-                onBack={() => setSelectedLawyer(null)}
-              />
-            )}
-            
-            {activeView === 'upload' && (
-              <FileUpload onFileUpload={handleFileUpload} />
-            )}
+            <div className="animate-fade-in">
+              {activeView === 'overview' && (
+                <DashboardOverview lawyers={filteredLawyers.length > 0 ? filteredLawyers : lawyers} />
+              )}
+              
+              {activeView === 'table' && !selectedLawyer && (
+                <LawyerTable 
+                  lawyers={filteredLawyers.length > 0 ? filteredLawyers : lawyers} 
+                  onLawyerSelect={handleLawyerSelect}
+                />
+              )}
+              
+              {activeView === 'table' && selectedLawyer && (
+                <LawyerDetails 
+                  lawyer={selectedLawyer} 
+                  onBack={() => setSelectedLawyer(null)}
+                />
+              )}
+              
+              {activeView === 'upload' && (
+                <FileUpload onFileUpload={handleFileUpload} />
+              )}
+            </div>
           </main>
         </SidebarInset>
       </div>
