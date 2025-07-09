@@ -120,7 +120,7 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
                     className="hover:bg-muted/50"
                   >
                     <TableCell className="font-medium">
-                      {lawyer.lawyer_name || lawyer.lawyer_id}
+                      {lawyer.lawyer_name || 'Unknown Lawyer'}
                     </TableCell>
                     <TableCell>{lawyer.lawyer_id}</TableCell>
                     <TableCell>{lawyer.branch_name}</TableCell>

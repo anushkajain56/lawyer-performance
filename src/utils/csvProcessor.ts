@@ -213,24 +213,40 @@ function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
     complaintsPerCase > 0.2
   ) ? 1 : 0;
 
-  // Extract lawyer name and expertise domains
+  // Extract lawyer name - try multiple field variations
   const lawyerName = (
     row.lawyer_name || 
     row.Lawyer_Name || 
     row['Lawyer Name'] || 
     row.name || 
     row.Name ||
+    row.LawyerName ||
+    row.lawyer ||
+    row.Lawyer ||
     `Lawyer_${Math.random().toString(36).substr(2, 9)}`
   ).toString();
 
+  // Extract expertise domains - try multiple field variations
   const expertiseDomains = (
     row.expertise_domains || 
     row.Expertise_Domains || 
     row['Expertise Domains'] ||
+    row.expertise_domain ||
+    row.Expertise_Domain ||
+    row['Expertise Domain'] ||
     row.domain || 
     row.Domain || 
     row.specialization || 
     row.Specialization ||
+    row.practice_area || 
+    row.Practice_Area || 
+    row['Practice Area'] ||
+    row.area_of_expertise ||
+    row.Area_of_Expertise ||
+    row['Area of Expertise'] ||
+    row.legal_domain ||
+    row.Legal_Domain ||
+    row['Legal Domain'] ||
     ['Corporate Law', 'Criminal Law', 'Family Law', 'Commercial Law', 'Civil Law', 'Tax Law'][Math.floor(Math.random() * 6)]
   ).toString();
 
@@ -338,9 +354,9 @@ function convertToLawyerFormat(processedRow: ProcessedRow): Lawyer {
   
   return {
     lawyer_id: processedRow.lawyer_id,
-    lawyer_name: processedRow.lawyer_name,
+    lawyer_name: processedRow.lawyer_name, // Use the actual lawyer name from CSV
     branch_name: processedRow.branch_name,
-    domain: processedRow.expertise_domains,
+    domain: processedRow.expertise_domains, // Use expertise_domains as the domain
     allocation_month: processedRow.allocation_month,
     case_id: processedRow.case_id.toString(),
     cases_assigned: processedRow.cases_assigned,
