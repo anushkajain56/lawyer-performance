@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Lawyer } from '@/types/lawyer';
@@ -62,9 +61,10 @@ export const useAddLawyers = () => {
         .from('lawyers')
         .insert(lawyers.map(lawyer => ({
           lawyer_id: lawyer.lawyer_id,
-          lawyer_name: null, // Will be added if available in CSV
+          lawyer_name: lawyer.lawyer_name || null,
           branch_id: null, // Will be added if available in CSV
           branch_name: lawyer.branch_name,
+          domain: lawyer.domain || null,
           allocation_month: lawyer.allocation_month,
           allocation_date: null, // Will be added if available in CSV
           case_id: lawyer.case_id,

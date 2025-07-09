@@ -34,6 +34,7 @@ export type Database = {
           complaints_per_case: number | null
           completion_rate: number | null
           created_at: string
+          domain: string | null
           feedback_flag: string | null
           feedback_flag_encoded: number | null
           id: string
@@ -75,6 +76,7 @@ export type Database = {
           complaints_per_case?: number | null
           completion_rate?: number | null
           created_at?: string
+          domain?: string | null
           feedback_flag?: string | null
           feedback_flag_encoded?: number | null
           id?: string
@@ -116,6 +118,7 @@ export type Database = {
           complaints_per_case?: number | null
           completion_rate?: number | null
           created_at?: string
+          domain?: string | null
           feedback_flag?: string | null
           feedback_flag_encoded?: number | null
           id?: string
