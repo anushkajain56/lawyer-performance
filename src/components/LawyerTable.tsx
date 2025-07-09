@@ -49,6 +49,30 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
       return sortDirection === 'asc' ? aStr.localeCompare(bStr) : bStr.localeCompare(aStr);
     });
 
+  // Helper function to format expertise domains
+  const formatExpertiseDomains = (domains: string | undefined) => {
+    if (!domains || domains.trim() === '') {
+      return <span className="text-muted-foreground">Not specified</span>;
+    }
+    
+    // Split by comma and create badges for each domain
+    const domainList = domains.split(',').map(domain => domain.trim()).filter(Boolean);
+    
+    if (domainList.length === 0) {
+      return <span className="text-muted-foreground">Not specified</span>;
+    }
+    
+    return (
+      <div className="flex flex-wrap gap-1">
+        {domainList.map((domain, index) => (
+          <Badge key={index} variant="outline" className="text-xs">
+            {domain}
+          </Badge>
+        ))}
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -120,22 +144,14 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
                     className="hover:bg-muted/50"
                   >
                     <TableCell className="font-medium">
-                      {lawyer.lawyer_name || 'Unknown Lawyer'}
+                      {lawyer.lawyer_name || (
+                        <span className="text-muted-foreground">Unknown Lawyer</span>
+                      )}
                     </TableCell>
                     <TableCell>{lawyer.lawyer_id}</TableCell>
                     <TableCell>{lawyer.branch_name}</TableCell>
                     <TableCell>
-                      {lawyer.expertise_domains ? (
-                        <div className="flex flex-wrap gap-1">
-                          {lawyer.expertise_domains.split(',').map((domain, index) => (
-                            <Badge key={index} variant="outline" className="text-xs">
-                              {domain.trim()}
-                            </Badge>
-                          ))}
-                        </div>
-                      ) : (
-                        <span className="text-muted-foreground">Not specified</span>
-                      )}
+                      {formatExpertiseDomains(lawyer.expertise_domains)}
                     </TableCell>
                     <TableCell>
                       <Badge variant={lawyer.allocation_status === 'Allocated' ? 'default' : 'outline'}>

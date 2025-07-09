@@ -18,33 +18,40 @@ export const useLawyers = () => {
         throw error;
       }
 
+      console.log('Raw database data sample:', data?.[0]); // Debug log
+
       // Transform database data to match our Lawyer type
-      return data.map((lawyer): Lawyer => ({
-        lawyer_id: lawyer.lawyer_id,
-        lawyer_name: lawyer.lawyer_name || undefined,
-        branch_name: lawyer.branch_name,
-        expertise_domains: lawyer.domain || undefined, // Map domain to expertise_domains
-        allocation_month: lawyer.allocation_month,
-        case_id: lawyer.case_id || '',
-        cases_assigned: lawyer.cases_assigned || 0,
-        cases_completed: lawyer.cases_completed || 0,
-        completion_rate: Number(lawyer.completion_rate) || 0,
-        cases_remaining: lawyer.cases_remaining || 0,
-        performance_score: Number(lawyer.performance_score) || 0,
-        tat_compliance_percent: Number(lawyer.tat_compliance_percent) || 0,
-        avg_tat_days: Number(lawyer.avg_tat_days) || 0,
-        tat_flag: (lawyer.tat_flag as 'Red' | 'Green') || 'Green',
-        quality_check_flag: lawyer.quality_check_flag === 'Pass',
-        client_feedback_score: Number(lawyer.client_feedback_score) || 0,
-        feedback_flag: lawyer.feedback_flag === 'Positive',
-        complaints_per_case: Number(lawyer.complaints_per_case) || 0,
-        reworks_per_case: Number(lawyer.reworks_per_case) || 0,
-        low_performance_flag: lawyer.low_performance_flag || false,
-        lawyer_score: Number(lawyer.lawyer_score) || 0,
-        quality_rating: Number(lawyer.client_feedback_score) || 0,
-        allocation_status: (lawyer.allocation_status as 'Allocated' | 'Available' | 'Pending' | 'Completed') || 'Available',
-        total_cases_ytd: lawyer.total_cases_ytd || 0
-      }));
+      return data.map((lawyer): Lawyer => {
+        const transformedLawyer = {
+          lawyer_id: lawyer.lawyer_id,
+          lawyer_name: lawyer.lawyer_name || undefined,
+          branch_name: lawyer.branch_name,
+          expertise_domains: lawyer.domain || undefined, // Map domain field from DB to expertise_domains
+          allocation_month: lawyer.allocation_month,
+          case_id: lawyer.case_id || '',
+          cases_assigned: lawyer.cases_assigned || 0,
+          cases_completed: lawyer.cases_completed || 0,
+          completion_rate: Number(lawyer.completion_rate) || 0,
+          cases_remaining: lawyer.cases_remaining || 0,
+          performance_score: Number(lawyer.performance_score) || 0,
+          tat_compliance_percent: Number(lawyer.tat_compliance_percent) || 0,
+          avg_tat_days: Number(lawyer.avg_tat_days) || 0,
+          tat_flag: (lawyer.tat_flag as 'Red' | 'Green') || 'Green',
+          quality_check_flag: lawyer.quality_check_flag === 'Pass',
+          client_feedback_score: Number(lawyer.client_feedback_score) || 0,
+          feedback_flag: lawyer.feedback_flag === 'Positive',
+          complaints_per_case: Number(lawyer.complaints_per_case) || 0,
+          reworks_per_case: Number(lawyer.reworks_per_case) || 0,
+          low_performance_flag: lawyer.low_performance_flag || false,
+          lawyer_score: Number(lawyer.lawyer_score) || 0,
+          quality_rating: Number(lawyer.client_feedback_score) || 0,
+          allocation_status: (lawyer.allocation_status as 'Allocated' | 'Available' | 'Pending' | 'Completed') || 'Available',
+          total_cases_ytd: lawyer.total_cases_ytd || 0
+        };
+        
+        console.log('Transformed lawyer:', transformedLawyer); // Debug log
+        return transformedLawyer;
+      });
     },
   });
 };
@@ -56,35 +63,35 @@ export const useAddLawyers = () => {
   return useMutation({
     mutationFn: async (lawyers: Lawyer[]) => {
       console.log('Attempting to insert lawyers:', lawyers.length);
-      console.log('First lawyer sample:', lawyers[0]);
+      console.log('First lawyer sample before insert:', lawyers[0]);
       
       const { data, error } = await supabase
         .from('lawyers')
         .insert(lawyers.map(lawyer => ({
           lawyer_id: lawyer.lawyer_id,
           lawyer_name: lawyer.lawyer_name || null,
-          branch_id: null, // Will be added if available in CSV
+          branch_id: null,
           branch_name: lawyer.branch_name,
-          domain: lawyer.expertise_domains || null, // Map expertise_domains to domain for database
+          domain: lawyer.expertise_domains || null, // Map expertise_domains to domain field for database
           allocation_month: lawyer.allocation_month,
-          allocation_date: null, // Will be added if available in CSV
+          allocation_date: null,
           case_id: lawyer.case_id,
           cases_assigned: lawyer.cases_assigned,
           cases_completed: lawyer.cases_completed,
           avg_tat_days: lawyer.avg_tat_days,
           tat_compliance_percent: lawyer.tat_compliance_percent,
           tat_flag: lawyer.tat_flag,
-          tat_bucket: null, // Will be added if available in CSV
-          quality_flags: 0, // Will be added if available in CSV
+          tat_bucket: null,
+          quality_flags: 0,
           quality_check_flag: lawyer.quality_check_flag ? 'Pass' : 'Fail',
           client_feedback_score: lawyer.client_feedback_score,
           feedback_flag: lawyer.feedback_flag ? 'Positive' : 'Neutral/Negative',
-          rework_count: 0, // Will be calculated from reworks_per_case
-          complaint_count: 0, // Will be calculated from complaints_per_case
-          max_capacity: 0, // Will be added if available in CSV
-          blacklist_status: false, // Will be added if available in CSV
+          rework_count: 0,
+          complaint_count: 0,
+          max_capacity: 0,
+          blacklist_status: false,
           total_cases_ytd: lawyer.total_cases_ytd,
-          quality_rating: 'Good', // Will be derived from client_feedback_score
+          quality_rating: 'Good',
           allocation_status: lawyer.allocation_status,
           completion_rate: lawyer.completion_rate,
           cases_remaining: lawyer.cases_remaining,
@@ -94,7 +101,7 @@ export const useAddLawyers = () => {
           feedback_flag_encoded: lawyer.feedback_flag ? 1 : 0,
           quality_check_flag_encoded: lawyer.quality_check_flag ? 1 : 0,
           allocation_status_encoded: lawyer.allocation_status === 'Allocated' ? 1 : 0,
-          allocation_month_num: new Date().getMonth() + 1, // Will be derived from allocation_date
+          allocation_month_num: new Date().getMonth() + 1,
           low_performance_flag: lawyer.low_performance_flag,
           performance_score: lawyer.performance_score,
           lawyer_score: lawyer.lawyer_score
