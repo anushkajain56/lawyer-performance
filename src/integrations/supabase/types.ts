@@ -16,83 +16,125 @@ export type Database = {
     Tables: {
       lawyers: {
         Row: {
+          allocation_date: string | null
           allocation_month: string
+          allocation_month_num: number | null
           allocation_status: string | null
+          allocation_status_encoded: number | null
           avg_tat_days: number | null
+          blacklist_status: boolean | null
+          branch_id: string | null
           branch_name: string
           case_id: string | null
           cases_assigned: number | null
           cases_completed: number | null
           cases_remaining: number | null
           client_feedback_score: number | null
+          complaint_count: number | null
           complaints_per_case: number | null
           completion_rate: number | null
           created_at: string
-          feedback_flag: boolean | null
+          feedback_flag: string | null
+          feedback_flag_encoded: number | null
           id: string
           lawyer_id: string
+          lawyer_name: string | null
           lawyer_score: number | null
           low_performance_flag: boolean | null
+          max_capacity: number | null
           performance_score: number | null
-          quality_check_flag: boolean | null
-          quality_rating: number | null
+          quality_check_flag: string | null
+          quality_check_flag_encoded: number | null
+          quality_flags: number | null
+          quality_rating: string | null
+          rework_count: number | null
           reworks_per_case: number | null
+          tat_bucket: string | null
           tat_compliance_percent: number | null
           tat_flag: string | null
+          tat_flag_encoded: number | null
           total_cases_ytd: number | null
           updated_at: string
         }
         Insert: {
+          allocation_date?: string | null
           allocation_month: string
+          allocation_month_num?: number | null
           allocation_status?: string | null
+          allocation_status_encoded?: number | null
           avg_tat_days?: number | null
+          blacklist_status?: boolean | null
+          branch_id?: string | null
           branch_name: string
           case_id?: string | null
           cases_assigned?: number | null
           cases_completed?: number | null
           cases_remaining?: number | null
           client_feedback_score?: number | null
+          complaint_count?: number | null
           complaints_per_case?: number | null
           completion_rate?: number | null
           created_at?: string
-          feedback_flag?: boolean | null
+          feedback_flag?: string | null
+          feedback_flag_encoded?: number | null
           id?: string
           lawyer_id: string
+          lawyer_name?: string | null
           lawyer_score?: number | null
           low_performance_flag?: boolean | null
+          max_capacity?: number | null
           performance_score?: number | null
-          quality_check_flag?: boolean | null
-          quality_rating?: number | null
+          quality_check_flag?: string | null
+          quality_check_flag_encoded?: number | null
+          quality_flags?: number | null
+          quality_rating?: string | null
+          rework_count?: number | null
           reworks_per_case?: number | null
+          tat_bucket?: string | null
           tat_compliance_percent?: number | null
           tat_flag?: string | null
+          tat_flag_encoded?: number | null
           total_cases_ytd?: number | null
           updated_at?: string
         }
         Update: {
+          allocation_date?: string | null
           allocation_month?: string
+          allocation_month_num?: number | null
           allocation_status?: string | null
+          allocation_status_encoded?: number | null
           avg_tat_days?: number | null
+          blacklist_status?: boolean | null
+          branch_id?: string | null
           branch_name?: string
           case_id?: string | null
           cases_assigned?: number | null
           cases_completed?: number | null
           cases_remaining?: number | null
           client_feedback_score?: number | null
+          complaint_count?: number | null
           complaints_per_case?: number | null
           completion_rate?: number | null
           created_at?: string
-          feedback_flag?: boolean | null
+          feedback_flag?: string | null
+          feedback_flag_encoded?: number | null
           id?: string
           lawyer_id?: string
+          lawyer_name?: string | null
           lawyer_score?: number | null
           low_performance_flag?: boolean | null
+          max_capacity?: number | null
           performance_score?: number | null
-          quality_check_flag?: boolean | null
-          quality_rating?: number | null
+          quality_check_flag?: string | null
+          quality_check_flag_encoded?: number | null
+          quality_flags?: number | null
+          quality_rating?: string | null
+          rework_count?: number | null
           reworks_per_case?: number | null
+          tat_bucket?: string | null
           tat_compliance_percent?: number | null
           tat_flag?: string | null
+          tat_flag_encoded?: number | null
           total_cases_ytd?: number | null
           updated_at?: string
         }

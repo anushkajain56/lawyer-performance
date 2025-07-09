@@ -1,4 +1,3 @@
-
 import { Lawyer } from '@/types/lawyer';
 
 export interface CSVProcessingResult {
@@ -15,14 +14,12 @@ export const parseCSVContent = (csvContent: string): CSVProcessingResult => {
       return { success: false, error: 'CSV file appears to be empty' };
     }
 
-    // Parse CSV with better error handling
     const lines = csvContent.trim().split('\n').filter(line => line.trim().length > 0);
     
     if (lines.length < 1) {
       return { success: false, error: 'CSV file must have at least a header row' };
     }
 
-    // Parse headers - handle both comma and semicolon separators
     let separator = ',';
     if (lines[0].includes(';') && !lines[0].includes(',')) {
       separator = ';';
@@ -33,7 +30,6 @@ export const parseCSVContent = (csvContent: string): CSVProcessingResult => {
     
     const processedData: Lawyer[] = [];
     
-    // If we only have headers, generate sample data
     if (lines.length === 1) {
       console.log('Only headers found, generating sample data');
       for (let i = 0; i < 5; i++) {
@@ -41,13 +37,11 @@ export const parseCSVContent = (csvContent: string): CSVProcessingResult => {
         processedData.push(sampleRow);
       }
     } else {
-      // Process actual data rows with feature engineering
       for (let i = 1; i < lines.length; i++) {
         try {
           const values = lines[i].split(separator).map(v => v.trim().replace(/"/g, ''));
           const row: any = {};
           
-          // Map CSV values to row object
           headers.forEach((header, index) => {
             row[header] = values[index] || '';
           });
@@ -56,7 +50,6 @@ export const parseCSVContent = (csvContent: string): CSVProcessingResult => {
           processedData.push(processedLawyer);
         } catch (rowError) {
           console.error(`Error processing row ${i}:`, rowError);
-          // Continue processing other rows
         }
       }
     }
@@ -72,69 +65,40 @@ export const parseCSVContent = (csvContent: string): CSVProcessingResult => {
 };
 
 function processLawyerDataWithFeatureEngineering(row: any, index: number): Lawyer {
-  // Parse base numeric values
-  const casesAssigned = parseInt(row.cases_assigned) || 0;
-  const casesCompleted = parseInt(row.cases_completed) || 0;
-  const complaintCount = parseInt(row.complaint_count) || 0;
-  const reworkCount = parseInt(row.rework_count) || 0;
-  const tatCompliancePercent = parseFloat(row.tat_compliance_percent) || 0;
+  // Parse numeric values with better error handling
+  const casesAssigned = parseInt(row.cases_assigned) || parseInt(row.Cases_Assigned) || 0;
+  const casesCompleted = parseInt(row.cases_completed) || parseInt(row.Cases_Completed) || 0;
+  const complaintCount = parseInt(row.complaint_count) || parseInt(row.Complaint_Count) || 0;
+  const reworkCount = parseInt(row.rework_count) || parseInt(row.Rework_Count) || 0;
+  const tatCompliancePercent = parseFloat(row.tat_compliance_percent) || parseFloat(row.TAT_Compliance_Percent) || 0;
   
-  // === Feature Engineering (following your Python logic) ===
-  
-  // 1. Completion rate
+  // Feature Engineering - following your Python logic exactly
   const completionRate = casesAssigned > 0 ? casesCompleted / casesAssigned : 0;
-  
-  // 2. Cases remaining
   const casesRemaining = Math.max(0, casesAssigned - casesCompleted);
-  
-  // 3. Complaints per case
   const complaintsPerCase = casesAssigned > 0 ? complaintCount / casesAssigned : 0;
-  
-  // 4. Reworks per case
   const reworksPerCase = casesAssigned > 0 ? reworkCount / casesAssigned : 0;
   
-  // 5. TAT flag encoded (Red = 1, Green = 0)
-  const tatFlag = row.tat_flag || (parseFloat(row.avg_tat_days) > 15 ? 'Red' : 'Green');
-  const tatFlagEncoded = tatFlag === 'Red' ? 1 : 0;
-  
-  // 6. Feedback flag encoded (Positive = 1, Neutral/Negative = 0)
-  const feedbackFlag = row.feedback_flag || 'Positive';
-  const feedbackFlagEncoded = feedbackFlag === 'Positive' ? 1 : 0;
-  
-  // 7. Quality check flag encoded (Pass = 1, Fail = 0)
-  const qualityCheckFlag = row.quality_check_flag || 'Pass';
-  const qualityCheckFlagEncoded = qualityCheckFlag === 'Pass' ? 1 : 0;
-  
-  // 8. Allocation status encoded (category codes)
-  const allocationStatus = row.allocation_status || 'Available';
-  const statusMapping: { [key: string]: number } = {
-    'Available': 0, 'Allocated': 1, 'Pending': 2, 'Busy': 3, 'On Leave': 4
-  };
-  const allocationStatusEncoded = statusMapping[allocationStatus] || 0;
-  
-  // 9. Allocation month number (from date)
-  let allocationMonthNum = 1;
-  if (row.allocation_date) {
-    try {
-      const date = new Date(row.allocation_date);
-      if (!isNaN(date.getTime())) {
-        allocationMonthNum = date.getMonth() + 1;
-      }
-    } catch (e) {
-      console.log('Error parsing allocation_date:', row.allocation_date);
-    }
+  // TAT flag (try different column name variations)
+  let tatFlag = row.tat_flag || row.TAT_Flag || row.TATFlag;
+  if (!tatFlag) {
+    const avgTatDays = parseFloat(row.avg_tat_days) || parseFloat(row.Avg_TAT_Days) || 0;
+    tatFlag = avgTatDays > 15 ? 'Red' : 'Green';
   }
   
-  // 10. Low performance flag
+  // Other flags
+  const feedbackFlag = row.feedback_flag || row.Feedback_Flag || 'Positive';
+  const qualityCheckFlag = row.quality_check_flag || row.Quality_Check_Flag || 'Pass';
+  
+  // Low performance flag calculation
   const lowPerformanceFlag = (
     completionRate < 0.5 ||
     tatCompliancePercent < 70 ||
     complaintsPerCase > 0.2
-  ) ? 1 : 0;
+  );
   
-  // Calculate additional metrics
-  const clientFeedbackScore = parseFloat(row.client_feedback_score) || Math.random() * 2 + 3;
-  const avgTatDays = parseFloat(row.avg_tat_days) || Math.random() * 20 + 5;
+  // Calculate metrics
+  const clientFeedbackScore = parseFloat(row.client_feedback_score) || parseFloat(row.Client_Feedback_Score) || Math.random() * 2 + 3;
+  const avgTatDays = parseFloat(row.avg_tat_days) || parseFloat(row.Avg_TAT_Days) || Math.random() * 20 + 5;
   
   // Calculate lawyer score (weighted performance metric)
   const lawyerScore = Math.min(1, Math.max(0, 
@@ -143,9 +107,9 @@ function processLawyerDataWithFeatureEngineering(row: any, index: number): Lawye
     (clientFeedbackScore / 5) * 0.3
   ));
 
-  // Process allocation month string
-  let allocationMonth = row.allocation_month;
-  if (row.allocation_date && !allocationMonth) {
+  // Process allocation month
+  let allocationMonth = row.allocation_month || row.Allocation_Month;
+  if (!allocationMonth && row.allocation_date) {
     try {
       const date = new Date(row.allocation_date);
       if (!isNaN(date.getTime())) {
@@ -162,15 +126,11 @@ function processLawyerDataWithFeatureEngineering(row: any, index: number): Lawye
     allocationMonth = `${months[now.getMonth()]}-${now.getFullYear()}`;
   }
 
-  // Create the final processed lawyer object with all engineered features
   return {
-    // Basic Info
-    lawyer_id: row.lawyer_id || `L${Date.now()}-${index}`,
-    branch_name: row.branch_name || 'Corporate',
+    lawyer_id: row.lawyer_id || row.Lawyer_ID || `L${Date.now()}-${index}`,
+    branch_name: row.branch_name || row.Branch_Name || 'Corporate',
     allocation_month: allocationMonth,
-    case_id: row.case_id || `C${Date.now()}-${index}`,
-    
-    // Core Performance Metrics
+    case_id: row.case_id || row.Case_ID || `C${Date.now()}-${index}`,
     cases_assigned: casesAssigned,
     cases_completed: casesCompleted,
     completion_rate: Math.round(completionRate * 10000) / 10000,
@@ -178,21 +138,17 @@ function processLawyerDataWithFeatureEngineering(row: any, index: number): Lawye
     performance_score: Math.round(lawyerScore * 10000) / 10000,
     tat_compliance_percent: Math.round(tatCompliancePercent * 100) / 100,
     avg_tat_days: Math.round(avgTatDays * 100) / 100,
-    
-    // Flags and Indicators
     tat_flag: tatFlag as 'Red' | 'Green',
-    quality_check_flag: qualityCheckFlagEncoded === 1,
+    quality_check_flag: qualityCheckFlag === 'Pass',
     client_feedback_score: Math.round(clientFeedbackScore * 100) / 100,
-    feedback_flag: feedbackFlagEncoded === 1,
+    feedback_flag: feedbackFlag === 'Positive',
     complaints_per_case: Math.round(complaintsPerCase * 10000) / 10000,
     reworks_per_case: Math.round(reworksPerCase * 10000) / 10000,
-    low_performance_flag: lowPerformanceFlag === 1,
-    
-    // Summary Metrics
+    low_performance_flag: lowPerformanceFlag,
     lawyer_score: Math.round(lawyerScore * 10000) / 10000,
     quality_rating: Math.round(clientFeedbackScore * 100) / 100,
-    allocation_status: allocationStatus as 'Allocated' | 'Available',
-    total_cases_ytd: parseInt(row.total_cases_ytd) || casesAssigned * (3 + Math.floor(Math.random() * 3))
+    allocation_status: (row.allocation_status || row.Allocation_Status || 'Available') as 'Allocated' | 'Available',
+    total_cases_ytd: parseInt(row.total_cases_ytd) || parseInt(row.Total_Cases_YTD) || casesAssigned * (3 + Math.floor(Math.random() * 3))
   };
 }
 
