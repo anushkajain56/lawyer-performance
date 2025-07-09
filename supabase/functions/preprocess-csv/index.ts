@@ -13,9 +13,9 @@ interface RawLawyerRow {
 interface ProcessedRow {
   lawyer_id: string;
   lawyer_name: string;
+  expertise_domains: string;
   branch_id: string;
   branch_name: string;
-  domain: string;
   allocation_month: string;
   allocation_date: Date | null;
   case_id: number;
@@ -48,7 +48,7 @@ interface ProcessedRow {
   low_performance_flag: number;
 }
 
-// XGBoost model feature importance weights from your trained model
+// XGBoost model feature importance weights
 const XGBOOST_FEATURE_WEIGHTS = {
   feedback_flag_encoded: 0.359135,
   quality_check_flag_encoded: 0.211663,
@@ -65,23 +65,21 @@ const XGBOOST_FEATURE_WEIGHTS = {
 }
 
 function calculateLawyerScore(processedRow: ProcessedRow): number {
-  // Normalize features to 0-1 scale for consistent scoring
   const normalizedFeatures = {
-    feedback_flag_encoded: processedRow.feedback_flag_encoded, // Already 0-1
-    quality_check_flag_encoded: processedRow.quality_check_flag_encoded, // Already 0-1
-    tat_compliance_percent: Math.min(processedRow.tat_compliance_percent / 100, 1), // Convert to 0-1
-    complaints_per_case: Math.min(processedRow.complaints_per_case, 1), // Cap at 1
-    avg_tat_days: Math.max(0, 1 - (processedRow.avg_tat_days / 30)), // Inverse: lower TAT is better
-    reworks_per_case: Math.min(processedRow.reworks_per_case, 1), // Cap at 1
-    cases_remaining: Math.max(0, 1 - (processedRow.cases_remaining / 100)), // Inverse: fewer remaining is better
-    low_performance_flag: 1 - processedRow.low_performance_flag, // Inverse: no low performance flag is better
-    completion_rate: processedRow.completion_rate, // Already 0-1
-    allocation_status_encoded: processedRow.allocation_status_encoded / 4, // Normalize to 0-1 (max encoded value is 4)
-    allocation_month_num: processedRow.allocation_month_num / 12, // Normalize to 0-1
-    tat_flag_encoded: 1 - processedRow.tat_flag_encoded // Inverse: Green (0) is better than Red (1)
+    feedback_flag_encoded: processedRow.feedback_flag_encoded,
+    quality_check_flag_encoded: processedRow.quality_check_flag_encoded,
+    tat_compliance_percent: Math.min(processedRow.tat_compliance_percent / 100, 1),
+    complaints_per_case: Math.min(processedRow.complaints_per_case, 1),
+    avg_tat_days: Math.max(0, 1 - (processedRow.avg_tat_days / 30)),
+    reworks_per_case: Math.min(processedRow.reworks_per_case, 1),
+    cases_remaining: Math.max(0, 1 - (processedRow.cases_remaining / 100)),
+    low_performance_flag: 1 - processedRow.low_performance_flag,
+    completion_rate: processedRow.completion_rate,
+    allocation_status_encoded: processedRow.allocation_status_encoded / 4,
+    allocation_month_num: processedRow.allocation_month_num / 12,
+    tat_flag_encoded: 1 - processedRow.tat_flag_encoded
   }
 
-  // Calculate weighted score using XGBoost feature importance
   let weightedScore = 0
   let totalWeight = 0
 
@@ -91,14 +89,11 @@ function calculateLawyerScore(processedRow: ProcessedRow): number {
     totalWeight += weight
   })
 
-  // Normalize by total weight and ensure score is between 0 and 1
-  const lawyerScore = totalWeight > 0 ? Math.max(0, Math.min(1, weightedScore / totalWeight)) : 0
-  
-  return lawyerScore
+  return totalWeight > 0 ? Math.max(0, Math.min(1, weightedScore / totalWeight)) : 0
 }
 
 serve(async (req) => {
-  console.log('Edge Function called with method:', req.method)
+  console.log('Edge Function called with pandas-style processing')
   
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -106,7 +101,6 @@ serve(async (req) => {
 
   try {
     if (req.method !== 'POST') {
-      console.log('Invalid method:', req.method)
       return new Response(
         JSON.stringify({ error: 'Method not allowed' }), 
         { 
@@ -116,7 +110,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('Processing CSV file with XGBoost-based lawyer scoring...')
+    console.log('Processing CSV file with pandas-style feature engineering...')
 
     let file: File;
     let csvContent: string;
@@ -126,7 +120,6 @@ serve(async (req) => {
       const uploadedFile = formData.get('file')
       
       if (!uploadedFile) {
-        console.log('No file found in form data')
         return new Response(
           JSON.stringify({ error: 'No file uploaded' }), 
           { 
@@ -137,12 +130,11 @@ serve(async (req) => {
       }
 
       file = uploadedFile as File
-      console.log('File received:', file.name, 'Size:', file.size, 'Type:', file.type)
+      console.log('File received:', file.name, 'Size:', file.size)
       csvContent = await file.text()
-      console.log('CSV content length:', csvContent.length)
       
     } catch (parseError) {
-      console.error('Error parsing form data or reading file:', parseError)
+      console.error('Error parsing form data:', parseError)
       return new Response(
         JSON.stringify({ error: 'Failed to read uploaded file' }), 
         { 
@@ -153,7 +145,6 @@ serve(async (req) => {
     }
     
     if (!csvContent || csvContent.trim().length === 0) {
-      console.log('CSV content is empty')
       return new Response(
         JSON.stringify({ error: 'CSV file appears to be empty' }), 
         { 
@@ -163,41 +154,25 @@ serve(async (req) => {
       )
     }
 
-    let lines: string[]
-    let headers: string[]
-    let separator: string
-
-    try {
-      lines = csvContent.trim().split('\n').filter(line => line.trim().length > 0)
-      
-      if (lines.length < 1) {
-        return new Response(
-          JSON.stringify({ error: 'CSV file must have at least a header row' }), 
-          { 
-            status: 400, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        )
-      }
-
-      separator = ','
-      if (lines[0].includes(';') && !lines[0].includes(',')) {
-        separator = ';'
-      }
-      
-      headers = lines[0].split(separator).map(h => h.trim().replace(/["']/g, ''))
-      console.log('CSV headers:', headers, 'Separator:', separator, 'Total lines:', lines.length)
-      
-    } catch (headerError) {
-      console.error('Error parsing CSV headers:', headerError)
+    const lines = csvContent.trim().split('\n').filter(line => line.trim().length > 0)
+    
+    if (lines.length < 1) {
       return new Response(
-        JSON.stringify({ error: 'Failed to parse CSV headers' }), 
+        JSON.stringify({ error: 'CSV file must have at least a header row' }), 
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
     }
+
+    let separator = ','
+    if (lines[0].includes(';') && !lines[0].includes(',')) {
+      separator = ';'
+    }
+    
+    const headers = lines[0].split(separator).map(h => h.trim().replace(/["']/g, ''))
+    console.log('Headers found:', headers)
     
     const rawRows: RawLawyerRow[] = []
     
@@ -208,9 +183,6 @@ serve(async (req) => {
         rawRows.push(sampleRow)
       }
     } else {
-      let successfulRows = 0
-      let failedRows = 0
-      
       for (let i = 1; i < lines.length; i++) {
         try {
           const values = lines[i].split(separator).map(v => v.trim().replace(/["']/g, ''))
@@ -221,26 +193,22 @@ serve(async (req) => {
           })
 
           rawRows.push(row)
-          successfulRows++
         } catch (rowError) {
-          console.error(`Error processing row ${i}:`, rowError, 'Row data:', lines[i])
-          failedRows++
+          console.error(`Error processing row ${i}:`, rowError)
         }
       }
-      
-      console.log(`Raw parsing complete: ${successfulRows} successful, ${failedRows} failed`)
     }
 
-    // Step 1: Process each row with feature engineering
+    // Step 1: Feature Engineering (pandas-style)
     const processedRows: ProcessedRow[] = rawRows.map(row => processRowWithFeatureEngineering(row))
     
-    // Step 2: Group by lawyer_id and apply aggregation rules
+    // Step 2: Group by lawyer_id and aggregate (pandas-style)
     const aggregatedData = aggregateByLawyerId(processedRows)
     
-    // Step 3: Convert to final format with XGBoost-based scoring
+    // Step 3: Convert to final format
     const finalData = aggregatedData.map(convertToFinalFormat)
 
-    console.log('Successfully processed', finalData.length, 'records with XGBoost-based lawyer scoring')
+    console.log('Successfully processed', finalData.length, 'records with pandas-style processing')
 
     return new Response(
       JSON.stringify(finalData),
@@ -253,11 +221,11 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Unexpected error in Edge Function:', error)
+    console.error('Error in Edge Function:', error)
     return new Response(
       JSON.stringify({ 
-        error: 'Internal server error while processing CSV file', 
-        details: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: 'Internal server error', 
+        details: error instanceof Error ? error.message : 'Unknown error'
       }),
       { 
         status: 500, 
@@ -271,17 +239,20 @@ serve(async (req) => {
 })
 
 function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
+  // Extract basic metrics
   const casesAssigned = parseNumber(row.cases_assigned || row.Cases_Assigned || row['Cases Assigned']) || 0
   const casesCompleted = parseNumber(row.cases_completed || row.Cases_Completed || row['Cases Completed']) || 0
   const complaintCount = parseNumber(row.complaint_count || row.Complaint_Count || row['Complaint Count']) || 0
   const reworkCount = parseNumber(row.rework_count || row.Rework_Count || row['Rework Count']) || 0
   const tatCompliancePercent = parseNumber(row.tat_compliance_percent || row.TAT_Compliance_Percent || row['TAT Compliance Percent']) || 0
   
+  // Pandas-style feature engineering
   const completionRate = casesAssigned > 0 ? casesCompleted / casesAssigned : 0
   const casesRemaining = casesAssigned - casesCompleted
   const complaintsPerCase = casesAssigned > 0 ? complaintCount / casesAssigned : 0
   const reworksPerCase = casesAssigned > 0 ? reworkCount / casesAssigned : 0
   
+  // Categorical encoding
   const tatFlag = (row.tat_flag || row.TAT_Flag || row['TAT Flag'] || 'Green').toString()
   const tatFlagEncoded = tatFlag === 'Red' ? 1 : 0
   
@@ -297,6 +268,7 @@ function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
   }
   const allocationStatusEncoded = statusMapping[allocationStatus] || 0
   
+  // Date processing
   let allocationDate: Date | null = null
   let allocationMonthNum = 1
   
@@ -314,31 +286,32 @@ function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
     }
   }
   
+  // Low performance calculation
   const lowPerformanceFlag = (
     completionRate < 0.5 ||
     tatCompliancePercent < 70 ||
     complaintsPerCase > 0.2
   ) ? 1 : 0
 
-  // Enhanced extraction of lawyer_name and domain with more possible field variations
+  // Extract lawyer name and domains with comprehensive field matching
   const lawyerName = (
     row.lawyer_name || 
     row.Lawyer_Name || 
     row['Lawyer Name'] || 
     row.name || 
-    row.Name || 
+    row.Name ||
     row.LawyerName ||
-    row.lawyer_id || 
-    row.Lawyer_ID || 
-    row['Lawyer ID'] ||
     `Lawyer_${Math.random().toString(36).substr(2, 9)}`
   ).toString()
 
-  const domain = (
+  const expertiseDomains = (
+    row.expertise_domains || 
+    row.Expertise_Domains || 
+    row['Expertise Domains'] ||
     row.domain || 
     row.Domain || 
     row.specialization || 
-    row.Specialization || 
+    row.Specialization ||
     row.practice_area || 
     row.Practice_Area || 
     row['Practice Area'] ||
@@ -348,15 +321,15 @@ function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
     row.Field ||
     row.area ||
     row.Area ||
-    ['Corporate', 'Criminal', 'Family', 'Commercial', 'Civil', 'Tax'][Math.floor(Math.random() * 6)]
+    ['Corporate Law', 'Criminal Law', 'Family Law', 'Commercial Law', 'Civil Law', 'Tax Law'][Math.floor(Math.random() * 6)]
   ).toString()
 
   return {
     lawyer_id: (row.lawyer_id || row.Lawyer_ID || row['Lawyer ID'] || `L${Date.now()}-${Math.random()}`).toString(),
     lawyer_name: lawyerName,
+    expertise_domains: expertiseDomains,
     branch_id: (row.branch_id || row.Branch_ID || row['Branch ID'] || 'B001').toString(),
     branch_name: (row.branch_name || row.Branch_Name || row['Branch Name'] || 'Corporate').toString(),
-    domain: domain,
     allocation_month: (row.allocation_month || row.Allocation_Month || row['Allocation Month'] || new Date().toISOString().slice(0, 7)).toString(),
     allocation_date: allocationDate,
     case_id: parseNumber(row.case_id || row.Case_ID || row['Case ID']) || 1,
@@ -405,42 +378,43 @@ function aggregateByLawyerId(processedRows: ProcessedRow[]): ProcessedRow[] {
   Object.keys(groupedData).forEach(lawyerId => {
     const rows = groupedData[lawyerId]
     
+    // Pandas-style aggregation rules
     const aggregatedRow: ProcessedRow = {
       lawyer_id: lawyerId,
-      lawyer_name: rows[0].lawyer_name, // Keep the first lawyer name found
-      branch_id: rows[0].branch_id,
-      branch_name: rows[0].branch_name,
-      domain: rows[0].domain, // Keep the first domain found
-      allocation_month: rows[0].allocation_month,
-      allocation_date: getMaxDate(rows.map(r => r.allocation_date)),
-      case_id: rows.length,
-      cases_assigned: sum(rows.map(r => r.cases_assigned)),
-      cases_completed: sum(rows.map(r => r.cases_completed)),
-      avg_tat_days: mean(rows.map(r => r.avg_tat_days)),
-      tat_compliance_percent: mean(rows.map(r => r.tat_compliance_percent)),
-      tat_flag: getMode(rows.map(r => r.tat_flag)),
-      tat_bucket: getMode(rows.map(r => r.tat_bucket)),
-      quality_flags: sum(rows.map(r => r.quality_flags)),
-      quality_check_flag: getMode(rows.map(r => r.quality_check_flag)),
-      client_feedback_score: mean(rows.map(r => r.client_feedback_score)),
-      feedback_flag: getMode(rows.map(r => r.feedback_flag)),
-      rework_count: sum(rows.map(r => r.rework_count)),
-      complaint_count: sum(rows.map(r => r.complaint_count)),
-      max_capacity: rows[0].max_capacity,
-      blacklist_status: Math.max(...rows.map(r => r.blacklist_status)),
-      total_cases_ytd: Math.round(mean(rows.map(r => r.total_cases_ytd))),
-      quality_rating: getMode(rows.map(r => r.quality_rating)),
-      allocation_status: getMode(rows.map(r => r.allocation_status)),
-      completion_rate: mean(rows.map(r => r.completion_rate)),
-      cases_remaining: sum(rows.map(r => r.cases_remaining)),
-      complaints_per_case: mean(rows.map(r => r.complaints_per_case)),
-      reworks_per_case: mean(rows.map(r => r.reworks_per_case)),
-      tat_flag_encoded: Math.round(mean(rows.map(r => r.tat_flag_encoded))),
-      feedback_flag_encoded: Math.round(mean(rows.map(r => r.feedback_flag_encoded))),
-      quality_check_flag_encoded: Math.round(mean(rows.map(r => r.quality_check_flag_encoded))),
-      allocation_status_encoded: Math.round(mean(rows.map(r => r.allocation_status_encoded))),
-      allocation_month_num: rows[0].allocation_month_num,
-      low_performance_flag: Math.max(...rows.map(r => r.low_performance_flag))
+      lawyer_name: rows[0].lawyer_name, // first
+      expertise_domains: [...new Set(rows.map(r => r.expertise_domains.trim()).filter(Boolean))].sort().join(', '), // unique domains
+      branch_id: rows[0].branch_id, // first
+      branch_name: rows[0].branch_name, // first
+      allocation_month: rows[0].allocation_month, // first
+      allocation_date: getMaxDate(rows.map(r => r.allocation_date)), // max
+      case_id: rows.length, // count
+      cases_assigned: sum(rows.map(r => r.cases_assigned)), // sum
+      cases_completed: sum(rows.map(r => r.cases_completed)), // sum
+      avg_tat_days: mean(rows.map(r => r.avg_tat_days)), // mean
+      tat_compliance_percent: mean(rows.map(r => r.tat_compliance_percent)), // mean
+      tat_flag: getMode(rows.map(r => r.tat_flag)), // mode
+      tat_bucket: getMode(rows.map(r => r.tat_bucket)), // mode
+      quality_flags: sum(rows.map(r => r.quality_flags)), // sum
+      quality_check_flag: getMode(rows.map(r => r.quality_check_flag)), // mode
+      client_feedback_score: mean(rows.map(r => r.client_feedback_score)), // mean
+      feedback_flag: getMode(rows.map(r => r.feedback_flag)), // mode
+      rework_count: sum(rows.map(r => r.rework_count)), // sum
+      complaint_count: sum(rows.map(r => r.complaint_count)), // sum
+      max_capacity: rows[0].max_capacity, // first
+      blacklist_status: Math.max(...rows.map(r => r.blacklist_status)), // max
+      total_cases_ytd: Math.round(mean(rows.map(r => r.total_cases_ytd))), // mean -> int
+      quality_rating: getMode(rows.map(r => r.quality_rating)), // mode
+      allocation_status: getMode(rows.map(r => r.allocation_status)), // mode
+      completion_rate: mean(rows.map(r => r.completion_rate)), // mean
+      cases_remaining: sum(rows.map(r => r.cases_remaining)), // sum
+      complaints_per_case: mean(rows.map(r => r.complaints_per_case)), // mean
+      reworks_per_case: mean(rows.map(r => r.reworks_per_case)), // mean
+      tat_flag_encoded: Math.round(mean(rows.map(r => r.tat_flag_encoded))), // mean -> int
+      feedback_flag_encoded: Math.round(mean(rows.map(r => r.feedback_flag_encoded))), // mean -> int
+      quality_check_flag_encoded: Math.round(mean(rows.map(r => r.quality_check_flag_encoded))), // mean -> int
+      allocation_status_encoded: Math.round(mean(rows.map(r => r.allocation_status_encoded))), // mean -> int
+      allocation_month_num: rows[0].allocation_month_num, // first
+      low_performance_flag: Math.max(...rows.map(r => r.low_performance_flag)) // max
     }
     
     aggregated.push(aggregatedRow)
@@ -450,48 +424,33 @@ function aggregateByLawyerId(processedRows: ProcessedRow[]): ProcessedRow[] {
 }
 
 function convertToFinalFormat(processedRow: ProcessedRow) {
-  // Calculate lawyer score using XGBoost model weights
   const lawyerScore = calculateLawyerScore(processedRow)
   
   return {
     lawyer_id: processedRow.lawyer_id,
     lawyer_name: processedRow.lawyer_name,
-    branch_id: processedRow.branch_id,
     branch_name: processedRow.branch_name,
-    domain: processedRow.domain,
+    domain: processedRow.expertise_domains,
     allocation_month: processedRow.allocation_month,
-    allocation_date: processedRow.allocation_date ? processedRow.allocation_date.toISOString().split('T')[0] : null,
     case_id: processedRow.case_id.toString(),
     cases_assigned: processedRow.cases_assigned,
     cases_completed: processedRow.cases_completed,
-    avg_tat_days: Math.round(processedRow.avg_tat_days * 100) / 100,
-    tat_compliance_percent: Math.round(processedRow.tat_compliance_percent * 100) / 100,
-    tat_flag: processedRow.tat_flag,
-    tat_bucket: processedRow.tat_bucket,
-    quality_flags: processedRow.quality_flags,
-    quality_check_flag: processedRow.quality_check_flag,
-    client_feedback_score: Math.round(processedRow.client_feedback_score * 100) / 100,
-    feedback_flag: processedRow.feedback_flag,
-    rework_count: processedRow.rework_count,
-    complaint_count: processedRow.complaint_count,
-    max_capacity: processedRow.max_capacity,
-    blacklist_status: processedRow.blacklist_status === 1,
-    total_cases_ytd: processedRow.total_cases_ytd,
-    quality_rating: processedRow.quality_rating,
-    allocation_status: processedRow.allocation_status,
     completion_rate: Math.round(processedRow.completion_rate * 10000) / 10000,
     cases_remaining: Math.max(0, processedRow.cases_remaining),
+    performance_score: lawyerScore,
+    tat_compliance_percent: Math.round(processedRow.tat_compliance_percent * 100) / 100,
+    avg_tat_days: Math.round(processedRow.avg_tat_days * 100) / 100,
+    tat_flag: processedRow.tat_flag,
+    quality_check_flag: processedRow.quality_check_flag === 'Pass',
+    client_feedback_score: Math.round(processedRow.client_feedback_score * 100) / 100,
+    feedback_flag: processedRow.feedback_flag === 'Positive',
     complaints_per_case: Math.round(processedRow.complaints_per_case * 10000) / 10000,
     reworks_per_case: Math.round(processedRow.reworks_per_case * 10000) / 10000,
-    tat_flag_encoded: processedRow.tat_flag_encoded,
-    feedback_flag_encoded: processedRow.feedback_flag_encoded,
-    quality_check_flag_encoded: processedRow.quality_check_flag_encoded,
-    allocation_status_encoded: processedRow.allocation_status_encoded,
-    allocation_month_num: processedRow.allocation_month_num,
     low_performance_flag: processedRow.low_performance_flag === 1,
-    performance_score: lawyerScore, // Using XGBoost-calculated score
-    lawyer_score: lawyerScore, // Using XGBoost-calculated score
-    quality_rating_score: Math.round(processedRow.client_feedback_score * 100) / 100
+    lawyer_score: lawyerScore,
+    quality_rating: Math.round(processedRow.client_feedback_score * 100) / 100,
+    allocation_status: processedRow.allocation_status,
+    total_cases_ytd: processedRow.total_cases_ytd
   }
 }
 
@@ -505,9 +464,9 @@ function generateSampleRawRow(index: number): RawLawyerRow {
   return {
     lawyer_id: `L${Date.now()}-${index}`,
     lawyer_name: names[index % names.length],
+    expertise_domains: domains[index % domains.length],
     branch_id: `B00${index % 4 + 1}`,
     branch_name: ['Mumbai', 'Delhi', 'Bangalore', 'Chennai'][index % 4],
-    domain: domains[index % domains.length],
     allocation_month: new Date().toISOString().slice(0, 7),
     allocation_date: new Date().toISOString().split('T')[0],
     case_id: `C${Date.now()}-${index}`,
