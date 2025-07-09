@@ -51,12 +51,12 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
 
   // Helper function to format expertise domains
   const formatExpertiseDomains = (domains: string | undefined) => {
-    if (!domains || domains.trim() === '') {
+    if (!domains || domains.trim() === '' || domains === 'undefined') {
       return <span className="text-muted-foreground">Not specified</span>;
     }
     
     // Split by comma and create badges for each domain
-    const domainList = domains.split(',').map(domain => domain.trim()).filter(Boolean);
+    const domainList = domains.split(',').map(domain => domain.trim()).filter(domain => domain && domain !== 'undefined');
     
     if (domainList.length === 0) {
       return <span className="text-muted-foreground">Not specified</span>;
@@ -71,6 +71,14 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
         ))}
       </div>
     );
+  };
+
+  // Helper function to format lawyer name
+  const formatLawyerName = (name: string | undefined) => {
+    if (!name || name.trim() === '' || name === 'undefined') {
+      return <span className="text-muted-foreground">Unknown Lawyer</span>;
+    }
+    return name;
   };
 
   return (
@@ -144,9 +152,7 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
                     className="hover:bg-muted/50"
                   >
                     <TableCell className="font-medium">
-                      {lawyer.lawyer_name || (
-                        <span className="text-muted-foreground">Unknown Lawyer</span>
-                      )}
+                      {formatLawyerName(lawyer.lawyer_name)}
                     </TableCell>
                     <TableCell>{lawyer.lawyer_id}</TableCell>
                     <TableCell>{lawyer.branch_name}</TableCell>

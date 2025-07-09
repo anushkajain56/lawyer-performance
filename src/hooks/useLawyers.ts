@@ -22,11 +22,21 @@ export const useLawyers = () => {
 
       // Transform database data to match our Lawyer type
       return data.map((lawyer): Lawyer => {
+        // Helper function to safely extract string values
+        const safeString = (value: any): string | undefined => {
+          if (value === null || value === undefined) return undefined;
+          if (typeof value === 'string') return value;
+          if (typeof value === 'object' && value.value !== undefined) {
+            return value.value === 'undefined' ? undefined : String(value.value);
+          }
+          return String(value);
+        };
+
         const transformedLawyer = {
           lawyer_id: lawyer.lawyer_id,
-          lawyer_name: lawyer.lawyer_name || undefined,
+          lawyer_name: safeString(lawyer.lawyer_name), // Use the actual lawyer_name from DB
           branch_name: lawyer.branch_name,
-          expertise_domains: lawyer.domain || undefined, // Map domain field from DB to expertise_domains
+          expertise_domains: safeString(lawyer.domain), // Map domain field from DB to expertise_domains
           allocation_month: lawyer.allocation_month,
           case_id: lawyer.case_id || '',
           cases_assigned: lawyer.cases_assigned || 0,
