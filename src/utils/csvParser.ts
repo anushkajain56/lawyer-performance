@@ -11,7 +11,6 @@ export interface RawLawyerRow {
 }
 
 export const parseCSVContent = (csvContent: string): CSVProcessingResult => {
-  console.log('=== STARTING CSV PARSING ===');
   try {
     console.log('Starting pandas-style CSV processing...');
     
@@ -55,8 +54,6 @@ export const parseCSVContent = (csvContent: string): CSVProcessingResult => {
       }
     }
 
-    console.log('First raw row sample:', rawRows[0]);
-    console.log('Raw rows count:', rawRows.length);
     return { success: true, data: rawRows as any };
   } catch (error) {
     console.error('Error parsing CSV:', error);

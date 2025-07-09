@@ -39,10 +39,6 @@ export interface ProcessedRow {
 }
 
 export function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
-  // Debug: Log the actual field names in the CSV row
-  console.log('CSV Row field names:', Object.keys(row));
-  console.log('Sample row data:', row);
-  
   // Extract basic fields with multiple possible names
   const casesAssigned = parseNumber(row.cases_assigned || row.Cases_Assigned || row['Cases Assigned']) || 0;
   const casesCompleted = parseNumber(row.cases_completed || row.Cases_Completed || row['Cases Completed']) || 0;
