@@ -1,5 +1,4 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { parse } from "https://deno.land/std@0.168.0/csv/mod.ts"
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,6 +62,55 @@ const XGBOOST_FEATURE_WEIGHTS = {
   allocation_status_encoded: 0.004249,
   allocation_month_num: 0.004054,
   tat_flag_encoded: 0.000000
+}
+
+// Simple CSV parser that handles quoted fields with commas
+function parseCSV(csvContent: string): string[][] {
+  const lines = csvContent.trim().split('\n')
+  const result: string[][] = []
+  
+  for (const line of lines) {
+    if (!line.trim()) continue
+    
+    const row: string[] = []
+    let current = ''
+    let inQuotes = false
+    let i = 0
+    
+    // Detect separator
+    const separator = line.includes(';') && !line.includes(',') ? ';' : ','
+    
+    while (i < line.length) {
+      const char = line[i]
+      const nextChar = line[i + 1]
+      
+      if (char === '"') {
+        if (inQuotes && nextChar === '"') {
+          // Escaped quote
+          current += '"'
+          i += 2
+        } else {
+          // Toggle quote state
+          inQuotes = !inQuotes
+          i++
+        }
+      } else if (char === separator && !inQuotes) {
+        // Field separator
+        row.push(current.trim())
+        current = ''
+        i++
+      } else {
+        current += char
+        i++
+      }
+    }
+    
+    // Add the last field
+    row.push(current.trim())
+    result.push(row)
+  }
+  
+  return result
 }
 
 function calculateLawyerScore(processedRow: ProcessedRow): number {
@@ -155,13 +203,10 @@ serve(async (req) => {
       )
     }
 
-    // Use proper CSV parser that handles quoted fields correctly
+    // Use custom CSV parser that handles quoted fields correctly
     let parsedData: string[][];
     try {
-      parsedData = parse(csvContent, {
-        skipFirstRow: false,
-        separator: csvContent.includes(';') && !csvContent.includes(',') ? ';' : ','
-      }) as string[][];
+      parsedData = parseCSV(csvContent);
     } catch (csvError) {
       console.error('CSV parsing error:', csvError)
       return new Response(
