@@ -25,11 +25,16 @@ export const useLawyers = () => {
         // Helper function to safely extract string values
         const safeString = (value: any): string | undefined => {
           if (value === null || value === undefined) return undefined;
-          if (typeof value === 'string') return value;
+          if (typeof value === 'string' && value.trim() !== '' && value !== 'undefined') return value.trim();
           if (typeof value === 'object' && value.value !== undefined) {
-            return value.value === 'undefined' ? undefined : String(value.value);
+            const val = value.value === 'undefined' ? undefined : String(value.value);
+            return val && val.trim() !== '' ? val.trim() : undefined;
           }
-          return String(value);
+          if (typeof value !== 'string') {
+            const stringVal = String(value);
+            return stringVal && stringVal.trim() !== '' && stringVal !== 'undefined' ? stringVal.trim() : undefined;
+          }
+          return undefined;
         };
 
         const transformedLawyer = {
@@ -75,14 +80,14 @@ export const useAddLawyers = () => {
       console.log('Attempting to insert lawyers:', lawyers.length);
       console.log('First lawyer sample before insert:', lawyers[0]);
       
-        const { data, error } = await supabase
+      const { data, error } = await supabase
         .from('lawyers')
         .insert(lawyers.map(lawyer => ({
           lawyer_id: lawyer.lawyer_id,
-          lawyer_name: String(lawyer.lawyer_name || ''), // Ensure string conversion
+          lawyer_name: lawyer.lawyer_name || null, // Preserve the actual lawyer_name
           branch_id: null,
           branch_name: lawyer.branch_name,
-          domain: String(lawyer.expertise_domains || ''), // Map frontend 'expertise_domains' to database 'domain' // Ensure string conversion and map to domain field
+          domain: lawyer.expertise_domains || null, // Map frontend 'expertise_domains' to database 'domain'
           allocation_month: lawyer.allocation_month,
           allocation_date: null,
           case_id: lawyer.case_id,

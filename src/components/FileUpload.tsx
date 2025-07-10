@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -62,9 +61,14 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
       throw new Error('Invalid response from Edge Function');
     }
 
-    return data.map((row: any, index: number) => ({
+    console.log('Edge Function response sample:', data[0]);
+
+    // Map the edge function response to our Lawyer type
+    return data.map((row: any, index: number): Lawyer => ({
       lawyer_id: row.lawyer_id || `L${Date.now()}-${index}`,
+      lawyer_name: row.lawyer_name || undefined, // Preserve the actual lawyer_name from edge function
       branch_name: row.branch_name || 'Corporate',
+      expertise_domains: row.expertise_domains || undefined, // Preserve the actual expertise_domains from edge function
       allocation_month: row.allocation_month || new Date().toISOString().slice(0, 7),
       case_id: row.case_id || `C${Date.now()}-${index}`,
       cases_assigned: parseInt(row.cases_assigned) || 30,
@@ -126,6 +130,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     
     try {
       const { data, method } = await processFile(file);
+      console.log('Preview data sample with names:', data.slice(0, 3));
       setPreview(data.slice(0, 5));
       setProcessingMethod(method);
       
@@ -155,6 +160,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     
     try {
       const { data, method } = await processFile(file);
+      console.log('Upload data sample with names:', data.slice(0, 3));
       setProcessingMethod(method);
       
       await addLawyersMutation.mutateAsync(data);
@@ -307,11 +313,12 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
                 <thead>
                   <tr className="border-b">
                     <th className="text-left p-2">Lawyer ID</th>
+                    <th className="text-left p-2">Lawyer Name</th>
                     <th className="text-left p-2">Branch</th>
+                    <th className="text-left p-2">Expertise Domains</th>
                     <th className="text-left p-2">Cases Assigned</th>
                     <th className="text-left p-2">Cases Completed</th>
                     <th className="text-left p-2">Completion Rate</th>
-                    <th className="text-left p-2">Low Performance</th>
                     <th className="text-left p-2">Lawyer Score</th>
                   </tr>
                 </thead>
@@ -319,17 +326,12 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
                   {preview.map((lawyer) => (
                     <tr key={lawyer.lawyer_id} className="border-b">
                       <td className="p-2 font-medium">{lawyer.lawyer_id}</td>
+                      <td className="p-2">{lawyer.lawyer_name || 'Not specified'}</td>
                       <td className="p-2">{lawyer.branch_name}</td>
+                      <td className="p-2">{lawyer.expertise_domains || 'Not specified'}</td>
                       <td className="p-2">{lawyer.cases_assigned}</td>
                       <td className="p-2">{lawyer.cases_completed}</td>
                       <td className="p-2">{(lawyer.completion_rate * 100).toFixed(1)}%</td>
-                      <td className="p-2">
-                        {lawyer.low_performance_flag ? (
-                          <span className="text-red-600 font-medium">Yes</span>
-                        ) : (
-                          <span className="text-green-600">No</span>
-                        )}
-                      </td>
                       <td className="p-2 font-bold text-blue-600">
                         {(lawyer.lawyer_score * 100).toFixed(1)}%
                       </td>
