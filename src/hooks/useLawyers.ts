@@ -43,7 +43,9 @@ export const useLawyers = () => {
           lawyer_id: lawyer.lawyer_id,
           lawyer_name: safeString(lawyer.lawyer_name),
           branch_name: lawyer.branch_name,
-          expertise_domains: safeString(lawyer.domain), // Preserve full expertise domains string
+          expertise_domains: Array.isArray(lawyer.domain) 
+            ? lawyer.domain.join(', ') 
+            : safeString(lawyer.domain), // Handle Postgres arrays correctly
           allocation_month: lawyer.allocation_month,
           case_id: lawyer.case_id || '',
           cases_assigned: lawyer.cases_assigned || 0,
