@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { parse } from "https://deno.land/std@0.168.0/csv/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -93,7 +94,7 @@ function calculateLawyerScore(processedRow: ProcessedRow): number {
 }
 
 serve(async (req) => {
-  console.log('Edge Function called with pandas-style processing')
+  console.log('Edge Function called with proper CSV parsing')
   
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -110,7 +111,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('Processing CSV file with pandas-style feature engineering...')
+    console.log('Processing CSV file with proper CSV parsing...')
 
     let file: File;
     let csvContent: string;
@@ -154,9 +155,25 @@ serve(async (req) => {
       )
     }
 
-    const lines = csvContent.trim().split('\n').filter(line => line.trim().length > 0)
-    
-    if (lines.length < 1) {
+    // Use proper CSV parser that handles quoted fields correctly
+    let parsedData: string[][];
+    try {
+      parsedData = parse(csvContent, {
+        skipFirstRow: false,
+        separator: csvContent.includes(';') && !csvContent.includes(',') ? ';' : ','
+      }) as string[][];
+    } catch (csvError) {
+      console.error('CSV parsing error:', csvError)
+      return new Response(
+        JSON.stringify({ error: 'Invalid CSV format' }), 
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    if (parsedData.length === 0) {
       return new Response(
         JSON.stringify({ error: 'CSV file must have at least a header row' }), 
         { 
@@ -166,35 +183,33 @@ serve(async (req) => {
       )
     }
 
-    let separator = ','
-    if (lines[0].includes(';') && !lines[0].includes(',')) {
-      separator = ';'
-    }
-    
-    const headers = lines[0].split(separator).map(h => h.trim().replace(/["']/g, ''))
+    const headers = parsedData[0].map(h => h.trim())
     console.log('Headers found:', headers)
     
     const rawRows: RawLawyerRow[] = []
     
-    if (lines.length === 1) {
+    if (parsedData.length === 1) {
       console.log('Only headers found, generating sample data')
       for (let i = 0; i < 10; i++) {
         const sampleRow = generateSampleRawRow(i + 1)
         rawRows.push(sampleRow)
       }
     } else {
-      for (let i = 1; i < lines.length; i++) {
-        try {
-          const values = lines[i].split(separator).map(v => v.trim().replace(/["']/g, ''))
-          const row: RawLawyerRow = {}
-          
-          headers.forEach((header, index) => {
-            row[header] = values[index] || ''
-          })
+      // Process data rows with proper CSV parsing
+      for (let i = 1; i < parsedData.length; i++) {
+        const values = parsedData[i]
+        const row: RawLawyerRow = {}
+        
+        headers.forEach((header, index) => {
+          // Values are already properly parsed by the CSV parser
+          row[header] = values[index] || ''
+        })
 
-          rawRows.push(row)
-        } catch (rowError) {
-          console.error(`Error processing row ${i}:`, rowError)
+        rawRows.push(row)
+        
+        // Debug log for expertise domains
+        if (i <= 3) {
+          console.log(`Row ${i} expertise_domains raw:`, row.expertise_domains || row.Expertise_Domains || row['Expertise Domains'])
         }
       }
     }
@@ -208,7 +223,7 @@ serve(async (req) => {
     // Step 3: Convert to final format
     const finalData = aggregatedData.map(convertToFinalFormat)
 
-    console.log('Successfully processed', finalData.length, 'records with pandas-style processing')
+    console.log('Successfully processed', finalData.length, 'records with proper CSV parsing')
 
     return new Response(
       JSON.stringify(finalData),
