@@ -304,7 +304,31 @@ function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
   const casesCompleted = parseNumber(row.cases_completed || row.Cases_Completed || row['Cases Completed']) || 0
   const complaintCount = parseNumber(row.complaint_count || row.Complaint_Count || row['Complaint Count']) || 0
   const reworkCount = parseNumber(row.rework_count || row.Rework_Count || row['Rework Count']) || 0
-  const tatCompliancePercent = parseNumber(row.tat_compliance_percent || row.TAT_Compliance_Percent || row['TAT Compliance Percent']) || 0
+  
+  // Extract and normalize TAT compliance percent with proper bounds checking
+  const rawTatCompliance = parseNumber(row.tat_compliance_percent || row.TAT_Compliance_Percent || row['TAT Compliance Percent']) || 0
+  let tatCompliancePercent = rawTatCompliance
+  
+  // If the value is greater than 100, assume it's already in percentage format but needs to be normalized
+  // If it's a decimal (like 0.75), convert it to percentage
+  if (rawTatCompliance > 100) {
+    // Cap extremely high values and log them for debugging
+    console.log(`Warning: TAT compliance ${rawTatCompliance}% seems unusually high, capping at 100%`)
+    tatCompliancePercent = 100
+  } else if (rawTatCompliance > 1 && rawTatCompliance <= 100) {
+    // Already in percentage format (1-100)
+    tatCompliancePercent = rawTatCompliance
+  } else if (rawTatCompliance >= 0 && rawTatCompliance <= 1) {
+    // Convert decimal to percentage (0.75 -> 75%)
+    tatCompliancePercent = rawTatCompliance * 100
+  } else {
+    // Invalid or negative values, default to 0
+    console.log(`Warning: Invalid TAT compliance value ${rawTatCompliance}, defaulting to 0%`)
+    tatCompliancePercent = 0
+  }
+  
+  // Ensure final value is within 0-100 range
+  tatCompliancePercent = Math.max(0, Math.min(100, tatCompliancePercent))
   
   // Pandas-style feature engineering
   const completionRate = casesAssigned > 0 ? casesCompleted / casesAssigned : 0
@@ -346,7 +370,7 @@ function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
     }
   }
   
-  // Low performance calculation
+  // Low performance calculation using normalized TAT compliance
   const lowPerformanceFlag = (
     completionRate < 0.5 ||
     tatCompliancePercent < 70 ||
@@ -396,7 +420,7 @@ function processRowWithFeatureEngineering(row: RawLawyerRow): ProcessedRow {
     cases_assigned: casesAssigned,
     cases_completed: casesCompleted,
     avg_tat_days: parseNumber(row.avg_tat_days || row.Avg_TAT_Days || row['Avg TAT Days']) || 0,
-    tat_compliance_percent: tatCompliancePercent,
+    tat_compliance_percent: tatCompliancePercent, // Now properly normalized to 0-100
     tat_flag: tatFlag,
     tat_bucket: (row.tat_bucket || row.TAT_Bucket || row['TAT Bucket'] || 'Normal').toString(),
     quality_flags: parseNumber(row.quality_flags || row.Quality_Flags || row['Quality Flags']) || 0,
