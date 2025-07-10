@@ -22,10 +22,12 @@ export const useLawyers = () => {
 
       // Transform database data to match our Lawyer type
       return data.map((lawyer): Lawyer => {
-        // Helper function to safely extract string values
+        // Helper function to safely extract string values - preserve full content
         const safeString = (value: any): string | undefined => {
           if (value === null || value === undefined) return undefined;
-          if (typeof value === 'string' && value.trim() !== '' && value !== 'undefined') return value.trim();
+          if (typeof value === 'string' && value.trim() !== '' && value !== 'undefined') {
+            return value.trim(); // Return full string content
+          }
           if (typeof value === 'object' && value.value !== undefined) {
             const val = value.value === 'undefined' ? undefined : String(value.value);
             return val && val.trim() !== '' ? val.trim() : undefined;
@@ -39,9 +41,9 @@ export const useLawyers = () => {
 
         const transformedLawyer = {
           lawyer_id: lawyer.lawyer_id,
-          lawyer_name: safeString(lawyer.lawyer_name), // Use the actual lawyer_name from DB
+          lawyer_name: safeString(lawyer.lawyer_name),
           branch_name: lawyer.branch_name,
-          expertise_domains: safeString(lawyer.domain), // Map domain field from DB to expertise_domains
+          expertise_domains: safeString(lawyer.domain), // Preserve full expertise domains string
           allocation_month: lawyer.allocation_month,
           case_id: lawyer.case_id || '',
           cases_assigned: lawyer.cases_assigned || 0,
@@ -64,7 +66,11 @@ export const useLawyers = () => {
           total_cases_ytd: lawyer.total_cases_ytd || 0
         };
         
-        console.log('Transformed lawyer:', transformedLawyer); // Debug log
+        console.log('Transformed lawyer with full expertise_domains:', {
+          id: transformedLawyer.lawyer_id,
+          name: transformedLawyer.lawyer_name,
+          domains: transformedLawyer.expertise_domains
+        });
         return transformedLawyer;
       });
     },
@@ -78,16 +84,20 @@ export const useAddLawyers = () => {
   return useMutation({
     mutationFn: async (lawyers: Lawyer[]) => {
       console.log('Attempting to insert lawyers:', lawyers.length);
-      console.log('First lawyer sample before insert:', lawyers[0]);
+      console.log('First lawyer sample before insert with full expertise_domains:', {
+        id: lawyers[0]?.lawyer_id,
+        name: lawyers[0]?.lawyer_name,
+        domains: lawyers[0]?.expertise_domains
+      });
       
       const { data, error } = await supabase
         .from('lawyers')
         .insert(lawyers.map(lawyer => ({
           lawyer_id: lawyer.lawyer_id,
-          lawyer_name: lawyer.lawyer_name || null, // Preserve the actual lawyer_name
+          lawyer_name: lawyer.lawyer_name || null,
           branch_id: null,
           branch_name: lawyer.branch_name,
-          domain: lawyer.expertise_domains || null, // Map frontend 'expertise_domains' to database 'domain'
+          domain: lawyer.expertise_domains || null, // Store full string in domain field
           allocation_month: lawyer.allocation_month,
           allocation_date: null,
           case_id: lawyer.case_id,

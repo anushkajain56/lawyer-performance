@@ -63,33 +63,39 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
 
     console.log('Edge Function response sample:', data[0]);
 
-    // Map the edge function response to our Lawyer type
-    return data.map((row: any, index: number): Lawyer => ({
-      lawyer_id: row.lawyer_id || `L${Date.now()}-${index}`,
-      lawyer_name: row.lawyer_name || undefined, // Preserve the actual lawyer_name from edge function
-      branch_name: row.branch_name || 'Corporate',
-      expertise_domains: row.expertise_domains || undefined, // Preserve the actual expertise_domains from edge function
-      allocation_month: row.allocation_month || new Date().toISOString().slice(0, 7),
-      case_id: row.case_id || `C${Date.now()}-${index}`,
-      cases_assigned: parseInt(row.cases_assigned) || 30,
-      cases_completed: parseInt(row.cases_completed) || 25,
-      completion_rate: parseFloat(row.completion_rate) || 0.8,
-      cases_remaining: parseInt(row.cases_remaining) || 5,
-      performance_score: parseFloat(row.performance_score) || 0.75,
-      tat_compliance_percent: parseFloat(row.tat_compliance_percent) || 0.8,
-      avg_tat_days: parseFloat(row.avg_tat_days) || 15,
-      tat_flag: (row.tat_flag as 'Red' | 'Green') || 'Green',
-      quality_check_flag: row.quality_check_flag === true || row.quality_check_flag === 'true',
-      client_feedback_score: parseFloat(row.client_feedback_score) || 4.0,
-      feedback_flag: row.feedback_flag === true || row.feedback_flag === 'true',
-      complaints_per_case: parseFloat(row.complaints_per_case) || 0.05,
-      reworks_per_case: parseFloat(row.reworks_per_case) || 0.1,
-      low_performance_flag: row.low_performance_flag === true || row.low_performance_flag === 'true',
-      lawyer_score: parseFloat(row.lawyer_score) || Math.random() * 0.4 + 0.6,
-      quality_rating: parseFloat(row.quality_rating) || 4.0,
-      allocation_status: (row.allocation_status as 'Allocated' | 'Available') || 'Available',
-      total_cases_ytd: parseInt(row.total_cases_ytd) || 100
-    }));
+    // Map the edge function response to our Lawyer type with proper expertise_domains handling
+    return data.map((row: any, index: number): Lawyer => {
+      // Ensure expertise_domains is properly preserved as a full string
+      const expertiseDomains = row.expertise_domains || row.domain;
+      console.log(`Lawyer ${index} expertise_domains from Edge Function:`, expertiseDomains);
+      
+      return {
+        lawyer_id: row.lawyer_id || `L${Date.now()}-${index}`,
+        lawyer_name: row.lawyer_name || undefined,
+        branch_name: row.branch_name || 'Corporate',
+        expertise_domains: expertiseDomains || undefined, // Preserve full string
+        allocation_month: row.allocation_month || new Date().toISOString().slice(0, 7),
+        case_id: row.case_id || `C${Date.now()}-${index}`,
+        cases_assigned: parseInt(row.cases_assigned) || 30,
+        cases_completed: parseInt(row.cases_completed) || 25,
+        completion_rate: parseFloat(row.completion_rate) || 0.8,
+        cases_remaining: parseInt(row.cases_remaining) || 5,
+        performance_score: parseFloat(row.performance_score) || 0.75,
+        tat_compliance_percent: parseFloat(row.tat_compliance_percent) || 0.8,
+        avg_tat_days: parseFloat(row.avg_tat_days) || 15,
+        tat_flag: (row.tat_flag as 'Red' | 'Green') || 'Green',
+        quality_check_flag: row.quality_check_flag === true || row.quality_check_flag === 'true',
+        client_feedback_score: parseFloat(row.client_feedback_score) || 4.0,
+        feedback_flag: row.feedback_flag === true || row.feedback_flag === 'true',
+        complaints_per_case: parseFloat(row.complaints_per_case) || 0.05,
+        reworks_per_case: parseFloat(row.reworks_per_case) || 0.1,
+        low_performance_flag: row.low_performance_flag === true || row.low_performance_flag === 'true',
+        lawyer_score: parseFloat(row.lawyer_score) || Math.random() * 0.4 + 0.6,
+        quality_rating: parseFloat(row.quality_rating) || 4.0,
+        allocation_status: (row.allocation_status as 'Allocated' | 'Available') || 'Available',
+        total_cases_ytd: parseInt(row.total_cases_ytd) || 100
+      };
+    });
   };
 
   const processWithClientSide = async (file: File): Promise<Lawyer[]> => {
@@ -130,7 +136,11 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     
     try {
       const { data, method } = await processFile(file);
-      console.log('Preview data sample with names:', data.slice(0, 3));
+      console.log('Preview data sample with expertise domains:', data.slice(0, 3).map(d => ({ 
+        id: d.lawyer_id, 
+        name: d.lawyer_name, 
+        domains: d.expertise_domains 
+      })));
       setPreview(data.slice(0, 5));
       setProcessingMethod(method);
       
@@ -160,7 +170,11 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     
     try {
       const { data, method } = await processFile(file);
-      console.log('Upload data sample with names:', data.slice(0, 3));
+      console.log('Upload data sample with expertise domains:', data.slice(0, 3).map(d => ({ 
+        id: d.lawyer_id, 
+        name: d.lawyer_name, 
+        domains: d.expertise_domains 
+      })));
       setProcessingMethod(method);
       
       await addLawyersMutation.mutateAsync(data);
@@ -315,7 +329,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
                     <th className="text-left p-2">Lawyer ID</th>
                     <th className="text-left p-2">Lawyer Name</th>
                     <th className="text-left p-2">Branch</th>
-                    <th className="text-left p-2">Expertise Domains</th>
+                    <th className="text-left p-2">All Expertise Domains</th>
                     <th className="text-left p-2">Cases Assigned</th>
                     <th className="text-left p-2">Cases Completed</th>
                     <th className="text-left p-2">Completion Rate</th>
@@ -328,7 +342,17 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
                       <td className="p-2 font-medium">{lawyer.lawyer_id}</td>
                       <td className="p-2">{lawyer.lawyer_name || 'Not specified'}</td>
                       <td className="p-2">{lawyer.branch_name}</td>
-                      <td className="p-2">{lawyer.expertise_domains || 'Not specified'}</td>
+                      <td className="p-2 max-w-xs">
+                        <div className="break-words">
+                          {lawyer.expertise_domains ? (
+                            <span className="text-sm">
+                              {lawyer.expertise_domains}
+                            </span>
+                          ) : (
+                            <span className="text-muted-foreground">Not specified</span>
+                          )}
+                        </div>
+                      </td>
                       <td className="p-2">{lawyer.cases_assigned}</td>
                       <td className="p-2">{lawyer.cases_completed}</td>
                       <td className="p-2">{(lawyer.completion_rate * 100).toFixed(1)}%</td>
