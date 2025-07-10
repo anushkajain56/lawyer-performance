@@ -428,9 +428,9 @@ function convertToFinalFormat(processedRow: ProcessedRow) {
   
   return {
     lawyer_id: processedRow.lawyer_id,
-    lawyer_name: processedRow.lawyer_name,
+    lawyer_name: processedRow.lawyer_name, // Ensure lawyer_name is correctly mapped
     branch_name: processedRow.branch_name,
-    domain: processedRow.expertise_domains,
+    expertise_domains: processedRow.expertise_domains, // Fixed: changed from 'domain' to 'expertise_domains'
     allocation_month: processedRow.allocation_month,
     case_id: processedRow.case_id.toString(),
     cases_assigned: processedRow.cases_assigned,
