@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,35 +17,35 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
       feature: 'Cases Completed', 
       value: lawyer.cases_completed, 
       importance: lawyer.completion_rate,
-      color: '#3B82F6',
+      color: 'hsl(213, 94%, 42%)', // Professional blue
       category: 'Productivity'
     },
     { 
       feature: 'Performance Score', 
       value: lawyer.performance_score * 100, 
       importance: lawyer.performance_score,
-      color: '#8B5CF6',
+      color: 'hsl(142, 76%, 36%)', // Professional green
       category: 'Overall'
     },
     { 
       feature: 'TAT Compliance', 
       value: lawyer.tat_compliance_percent, 
       importance: lawyer.tat_compliance_percent / 100,
-      color: '#10B981',
+      color: 'hsl(32, 95%, 44%)', // Professional orange
       category: 'Efficiency'
     },
     { 
       feature: 'Client Feedback', 
       value: lawyer.client_feedback_score * 20, 
       importance: lawyer.client_feedback_score / 5,
-      color: '#F59E0B',
+      color: 'hsl(199, 89%, 48%)', // Professional cyan
       category: 'Quality'
     },
     { 
       feature: 'Quality Rating', 
       value: lawyer.quality_rating * 20, 
       importance: lawyer.quality_rating / 5,
-      color: '#EF4444',
+      color: 'hsl(220, 14%, 41%)', // Professional gray
       category: 'Quality'
     },
   ];
@@ -156,7 +155,7 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
             <CardTitle>Lawyer Score</CardTitle>
           </CardHeader>
           <CardContent className="text-center space-y-4">
-            <div className="text-4xl font-bold text-blue-600">
+            <div className="text-4xl font-bold text-primary">
               {(lawyer.lawyer_score * 100).toFixed(1)}%
             </div>
             <Progress value={lawyer.lawyer_score * 100} className="w-full" />
@@ -185,7 +184,7 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {performanceMetrics.map(metric => (
                 <div key={metric.label} className="text-center p-4 border rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600">
+                  <div className="text-2xl font-bold text-primary">
                     {metric.value}{metric.unit}
                   </div>
                   <div className="text-sm text-muted-foreground">
@@ -201,7 +200,7 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-3">
-            <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
+            <div className="w-1 h-8 bg-gradient-to-b from-primary to-primary/60 rounded-full"></div>
             <div>
               <CardTitle className="text-xl">Performance Breakdown</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">

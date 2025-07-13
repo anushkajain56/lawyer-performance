@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -33,13 +32,13 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
   })).sort((a, b) => b.avgScore - a.avgScore);
 
   const tatData = [
-    { name: 'Green', value: lawyers.filter(l => l.tat_flag === 'Green').length, color: '#10b981' },
-    { name: 'Red', value: lawyers.filter(l => l.tat_flag === 'Red').length, color: '#ef4444' },
+    { name: 'Green', value: lawyers.filter(l => l.tat_flag === 'Green').length, color: 'hsl(142, 76%, 36%)' },
+    { name: 'Red', value: lawyers.filter(l => l.tat_flag === 'Red').length, color: 'hsl(0, 84%, 60%)' },
   ];
 
   const performanceData = [
-    { name: 'Normal', value: lawyers.filter(l => !l.low_performance_flag).length, color: '#3b82f6' },
-    { name: 'Low Performance', value: lowPerformance, color: '#ef4444' },
+    { name: 'Normal', value: lawyers.filter(l => !l.low_performance_flag).length, color: 'hsl(213, 94%, 42%)' },
+    { name: 'Low Performance', value: lowPerformance, color: 'hsl(0, 84%, 60%)' },
   ];
 
   const renderTatLegend = (props: any) => {
@@ -70,11 +69,11 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
           <p className="font-semibold text-foreground mb-3">{data.fullBranch}</p>
           <div className="space-y-2 text-sm">
             <p className="text-muted-foreground flex items-center">
-              <span className="inline-block w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 mr-2"></span>
+              <span className="inline-block w-3 h-3 rounded-full bg-primary mr-2"></span>
               Performance Score (%): <span className="font-medium text-foreground ml-1">{data.avgScore}%</span>
             </p>
             <p className="text-muted-foreground flex items-center">
-              <span className="inline-block w-3 h-3 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 mr-2"></span>
+              <span className="inline-block w-3 h-3 rounded-full" style={{ backgroundColor: 'hsl(142, 76%, 36%)' }}></span>
               Completion Rate (%): <span className="font-medium text-foreground ml-1">{data.avgCompletionRate}%</span>
             </p>
             <p className="text-muted-foreground mt-3">
@@ -147,7 +146,7 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
         <Card className="col-span-1 lg:col-span-2">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <div className="w-2 h-6 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
+              <div className="w-2 h-6 bg-gradient-to-b from-primary to-primary/60 rounded-full"></div>
               Performance by Branch
             </CardTitle>
             <p className="text-sm text-muted-foreground">
@@ -159,12 +158,12 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
               <ComposedChart data={chartData} margin={{ top: 20, right: 40, left: 40, bottom: 60 }}>
                 <defs>
                   <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.6}/>
+                    <stop offset="0%" stopColor="hsl(213, 94%, 42%)" stopOpacity={0.8}/>
+                    <stop offset="100%" stopColor="hsl(213, 94%, 42%)" stopOpacity={0.6}/>
                   </linearGradient>
                   <linearGradient id="completionGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
-                    <stop offset="100%" stopColor="#059669" stopOpacity={0.6}/>
+                    <stop offset="0%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.8}/>
+                    <stop offset="100%" stopColor="hsl(142, 76%, 36%)" stopOpacity={0.6}/>
                   </linearGradient>
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
@@ -213,10 +212,10 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
                   yAxisId="right"
                   type="monotone" 
                   dataKey="avgCompletionRate" 
-                  stroke="url(#completionGradient)"
+                  stroke="hsl(142, 76%, 36%)"
                   strokeWidth={3}
-                  dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
-                  activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2 }}
+                  dot={{ fill: 'hsl(142, 76%, 36%)', strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6, stroke: 'hsl(142, 76%, 36%)', strokeWidth: 2 }}
                 />
               </ComposedChart>
             </ResponsiveContainer>
