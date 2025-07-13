@@ -20,7 +20,6 @@ export function aggregateByLawyerId(processedRows: ProcessedRow[]): ProcessedRow
       lawyer_id: lawyerId,
       lawyer_name: rows[0].lawyer_name, // first
       expertise_domains: [...new Set(rows.map(r => r.expertise_domains.trim()).filter(Boolean))].sort().join(', '), // unique domains joined
-      branch_id: rows[0].branch_id, // first
       branch_name: rows[0].branch_name, // first
       allocation_month: rows[0].allocation_month, // first
       allocation_date: getMaxDate(rows.map(r => r.allocation_date)), // max
