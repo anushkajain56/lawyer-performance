@@ -16,7 +16,7 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
   const featureImportance = [
     { feature: 'Cases Completed', value: lawyer.cases_completed, importance: lawyer.completion_rate },
     { feature: 'Performance Score', value: lawyer.performance_score * 100, importance: lawyer.performance_score },
-    { feature: 'TAT Compliance', value: lawyer.tat_compliance_percent * 100, importance: lawyer.tat_compliance_percent },
+    { feature: 'TAT Compliance', value: lawyer.tat_compliance_percent, importance: lawyer.tat_compliance_percent / 100 },
     { feature: 'Client Feedback', value: lawyer.client_feedback_score * 20, importance: lawyer.client_feedback_score / 5 },
     { feature: 'Quality Rating', value: lawyer.quality_rating * 20, importance: lawyer.quality_rating / 5 },
   ];
@@ -142,7 +142,7 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
           <CardContent className="space-y-3">
             <div className="flex justify-between">
               <span className="text-muted-foreground">TAT Compliance:</span>
-              <span className="font-medium">{(lawyer.tat_compliance_percent * 100).toFixed(1)}%</span>
+              <span className="font-medium">{lawyer.tat_compliance_percent.toFixed(1)}%</span>
             </div>
             <div className="flex justify-between">
               <span className="text-muted-foreground">Client Feedback Score:</span>
@@ -185,9 +185,9 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
             <div>
               <div className="flex justify-between mb-2">
                 <span className="text-sm">TAT Compliance</span>
-                <span className="text-sm font-medium">{(lawyer.tat_compliance_percent * 100).toFixed(1)}%</span>
+                <span className="text-sm font-medium">{lawyer.tat_compliance_percent.toFixed(1)}%</span>
               </div>
-              <Progress value={lawyer.tat_compliance_percent * 100} />
+              <Progress value={lawyer.tat_compliance_percent} />
             </div>
           </CardContent>
         </Card>
