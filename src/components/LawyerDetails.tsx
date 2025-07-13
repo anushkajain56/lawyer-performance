@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import { ArrowLeft } from "lucide-react";
 import { Lawyer } from "@/types/lawyer";
 
@@ -14,11 +14,41 @@ interface LawyerDetailsProps {
 
 export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
   const featureImportance = [
-    { feature: 'Cases Completed', value: lawyer.cases_completed, importance: lawyer.completion_rate },
-    { feature: 'Performance Score', value: lawyer.performance_score * 100, importance: lawyer.performance_score },
-    { feature: 'TAT Compliance', value: lawyer.tat_compliance_percent, importance: lawyer.tat_compliance_percent / 100 },
-    { feature: 'Client Feedback', value: lawyer.client_feedback_score * 20, importance: lawyer.client_feedback_score / 5 },
-    { feature: 'Quality Rating', value: lawyer.quality_rating * 20, importance: lawyer.quality_rating / 5 },
+    { 
+      feature: 'Cases Completed', 
+      value: lawyer.cases_completed, 
+      importance: lawyer.completion_rate,
+      color: '#3B82F6',
+      category: 'Productivity'
+    },
+    { 
+      feature: 'Performance Score', 
+      value: lawyer.performance_score * 100, 
+      importance: lawyer.performance_score,
+      color: '#8B5CF6',
+      category: 'Overall'
+    },
+    { 
+      feature: 'TAT Compliance', 
+      value: lawyer.tat_compliance_percent, 
+      importance: lawyer.tat_compliance_percent / 100,
+      color: '#10B981',
+      category: 'Efficiency'
+    },
+    { 
+      feature: 'Client Feedback', 
+      value: lawyer.client_feedback_score * 20, 
+      importance: lawyer.client_feedback_score / 5,
+      color: '#F59E0B',
+      category: 'Quality'
+    },
+    { 
+      feature: 'Quality Rating', 
+      value: lawyer.quality_rating * 20, 
+      importance: lawyer.quality_rating / 5,
+      color: '#EF4444',
+      category: 'Quality'
+    },
   ];
 
   const performanceMetrics = [
@@ -29,6 +59,65 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
     { label: 'Total Cases YTD', value: lawyer.total_cases_ytd, unit: '' },
     { label: 'Avg TAT Days', value: lawyer.avg_tat_days.toFixed(1), unit: ' days' },
   ];
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-background/95 backdrop-blur-sm border border-border rounded-lg p-4 shadow-xl min-w-[220px]">
+          <p className="font-semibold text-foreground mb-3 text-base">{data.feature}</p>
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Category:</span>
+              <Badge variant="secondary" className="text-xs">
+                {data.category}
+              </Badge>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Current Value:</span>
+              <span className="font-medium text-foreground">
+                {typeof data.value === 'number' ? data.value.toFixed(1) : data.value}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Score Impact:</span>
+              <span className="font-medium text-foreground">
+                {(data.importance * 100).toFixed(1)}%
+              </span>
+            </div>
+          </div>
+          <div className="mt-3 pt-2 border-t border-border">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-muted-foreground">Performance Level:</span>
+              <span className={`text-xs font-medium ${
+                data.importance >= 0.8 ? 'text-green-600' : 
+                data.importance >= 0.6 ? 'text-yellow-600' : 'text-red-600'
+              }`}>
+                {data.importance >= 0.8 ? 'Excellent' : 
+                 data.importance >= 0.6 ? 'Good' : 'Needs Improvement'}
+              </span>
+            </div>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const CustomLabel = ({ x, y, width, height, value }: any) => {
+    return (
+      <text 
+        x={x + width / 2} 
+        y={y - 8} 
+        fill="hsl(var(--foreground))" 
+        textAnchor="middle" 
+        dy={-6}
+        className="text-xs font-medium"
+      >
+        {typeof value === 'number' ? value.toFixed(0) : value}
+      </text>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -111,26 +200,86 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
 
       <Card>
         <CardHeader>
-          <CardTitle>Performance Breakdown</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Key metrics contributing to the lawyer score
-          </p>
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-8 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
+            <div>
+              <CardTitle className="text-xl">Performance Breakdown</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                Detailed analysis of key performance indicators contributing to overall lawyer score
+              </p>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={featureImportance}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="feature" />
-              <YAxis />
-              <Tooltip 
-                formatter={(value, name) => [
-                  name === 'importance' ? `${(value as number * 100).toFixed(1)}%` : value,
-                  name === 'importance' ? 'Score' : 'Value'
-                ]}
+          <ResponsiveContainer width="100%" height={350}>
+            <BarChart 
+              data={featureImportance} 
+              margin={{ top: 30, right: 30, left: 20, bottom: 20 }}
+              barCategoryGap="20%"
+            >
+              <defs>
+                {featureImportance.map((item, index) => (
+                  <linearGradient key={index} id={`gradient-${index}`} x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor={item.color} stopOpacity={0.9}/>
+                    <stop offset="100%" stopColor={item.color} stopOpacity={0.6}/>
+                  </linearGradient>
+                ))}
+              </defs>
+              <CartesianGrid 
+                strokeDasharray="3 3" 
+                stroke="hsl(var(--border))" 
+                opacity={0.4}
+                horizontal={true}
+                vertical={false}
               />
-              <Bar dataKey="value" fill="#3b82f6" name="Current Value" />
+              <XAxis 
+                dataKey="feature" 
+                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                axisLine={{ stroke: 'hsl(var(--border))' }}
+                tickLine={{ stroke: 'hsl(var(--border))' }}
+                angle={-15}
+                textAnchor="end"
+                height={60}
+                interval={0}
+              />
+              <YAxis 
+                tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                axisLine={{ stroke: 'hsl(var(--border))' }}
+                tickLine={{ stroke: 'hsl(var(--border))' }}
+                label={{ 
+                  value: 'Performance Value', 
+                  angle: -90, 
+                  position: 'insideLeft',
+                  style: { textAnchor: 'middle', fontSize: '12px', fill: 'hsl(var(--muted-foreground))' }
+                }}
+              />
+              <Tooltip content={<CustomTooltip />} />
+              <Bar 
+                dataKey="value" 
+                radius={[6, 6, 0, 0]}
+                stroke="hsl(var(--border))"
+                strokeWidth={1}
+                label={<CustomLabel />}
+              >
+                {featureImportance.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={`url(#gradient-${index})`} />
+                ))}
+              </Bar>
             </BarChart>
           </ResponsiveContainer>
+          <div className="mt-4 flex flex-wrap gap-4 justify-center">
+            {featureImportance.map((item, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <div 
+                  className="w-3 h-3 rounded-sm" 
+                  style={{ backgroundColor: item.color }}
+                />
+                <span className="text-xs text-muted-foreground">
+                  {item.feature} ({item.category})
+                </span>
+              </div>
+            ))}
+          </div>
         </CardContent>
       </Card>
 
