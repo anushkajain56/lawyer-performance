@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { Lawyer } from "@/types/lawyer";
 
 interface DashboardOverviewProps {
@@ -38,6 +38,26 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
     { name: 'Normal', value: lawyers.filter(l => !l.low_performance_flag).length, color: '#3b82f6' },
     { name: 'Low Performance', value: lowPerformance, color: '#ef4444' },
   ];
+
+  const renderTatLegend = (props: any) => {
+    const { payload } = props;
+    return (
+      <div className="flex justify-center gap-6 mt-4">
+        {payload.map((entry: any, index: number) => (
+          <div key={index} className="flex items-center gap-2">
+            <div 
+              className="w-3 h-3 rounded-full" 
+              style={{ backgroundColor: entry.color }}
+            />
+            <span className="text-sm">
+              <span className="font-medium">{entry.value}:</span> {' '}
+              {entry.value === 'Green' ? 'Meeting TAT deadlines' : 'Missing TAT deadlines'}
+            </span>
+          </div>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -113,6 +133,9 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
         <Card>
           <CardHeader>
             <CardTitle>TAT Compliance Distribution</CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Turn Around Time (TAT) compliance status across all lawyers
+            </p>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
@@ -130,6 +153,7 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
                   ))}
                 </Pie>
                 <Tooltip />
+                <Legend content={renderTatLegend} />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
