@@ -1,4 +1,3 @@
-
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -66,18 +65,18 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
-          <p className="font-semibold text-foreground mb-2">{data.fullBranch}</p>
-          <div className="space-y-1 text-sm">
-            <p className="text-muted-foreground">
+        <div className="bg-background border border-border rounded-lg p-4 shadow-lg min-w-[200px]">
+          <p className="font-semibold text-foreground mb-3">{data.fullBranch}</p>
+          <div className="space-y-2 text-sm">
+            <p className="text-muted-foreground flex items-center">
               <span className="inline-block w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 mr-2"></span>
-              Lawyer Score: <span className="font-medium text-foreground">{data.avgScore}%</span>
+              Performance Score (%): <span className="font-medium text-foreground ml-1">{data.avgScore}%</span>
             </p>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground flex items-center">
               <span className="inline-block w-3 h-3 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 mr-2"></span>
-              Completion Rate: <span className="font-medium text-foreground">{data.avgCompletionRate}%</span>
+              Completion Rate (%): <span className="font-medium text-foreground ml-1">{data.avgCompletionRate}%</span>
             </p>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground mt-3">
               Total Lawyers: <span className="font-medium text-foreground">{data.count}</span>
             </p>
             <p className="text-muted-foreground">
