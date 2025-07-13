@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -12,40 +13,43 @@ interface LawyerDetailsProps {
 }
 
 export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
+  // Calculate correct cases remaining
+  const correctCasesRemaining = lawyer.cases_assigned - lawyer.cases_completed;
+
   const featureImportance = [
     { 
       feature: 'Cases Completed', 
       value: lawyer.cases_completed, 
       importance: lawyer.completion_rate,
-      color: 'hsl(213, 94%, 42%)', // Professional blue
+      color: 'var(--chart-primary)', 
       category: 'Productivity'
     },
     { 
       feature: 'Performance Score', 
       value: lawyer.performance_score * 100, 
       importance: lawyer.performance_score,
-      color: 'hsl(142, 76%, 36%)', // Professional green
+      color: 'var(--chart-secondary)', 
       category: 'Overall'
     },
     { 
       feature: 'TAT Compliance', 
       value: lawyer.tat_compliance_percent, 
       importance: lawyer.tat_compliance_percent / 100,
-      color: 'hsl(32, 95%, 44%)', // Professional orange
+      color: 'var(--chart-accent)', 
       category: 'Efficiency'
     },
     { 
       feature: 'Client Feedback', 
       value: lawyer.client_feedback_score * 20, 
       importance: lawyer.client_feedback_score / 5,
-      color: 'hsl(199, 89%, 48%)', // Professional cyan
+      color: 'var(--chart-tertiary)', 
       category: 'Quality'
     },
     { 
       feature: 'Quality Rating', 
       value: lawyer.quality_rating * 20, 
       importance: lawyer.quality_rating / 5,
-      color: 'hsl(220, 14%, 41%)', // Professional gray
+      color: 'var(--chart-quaternary)', 
       category: 'Quality'
     },
   ];
@@ -54,7 +58,7 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
     { label: 'Cases Assigned', value: lawyer.cases_assigned, unit: '' },
     { label: 'Cases Completed', value: lawyer.cases_completed, unit: '' },
     { label: 'Completion Rate', value: (lawyer.completion_rate * 100).toFixed(1), unit: '%' },
-    { label: 'Cases Remaining', value: lawyer.cases_remaining, unit: '' },
+    { label: 'Cases Remaining', value: correctCasesRemaining, unit: '' },
     { label: 'Total Cases YTD', value: lawyer.total_cases_ytd, unit: '' },
     { label: 'Avg TAT Days', value: lawyer.avg_tat_days.toFixed(1), unit: ' days' },
   ];
@@ -127,7 +131,7 @@ export function LawyerDetails({ lawyer, onBack }: LawyerDetailsProps) {
         </Button>
         <div>
           <h1 className="text-3xl font-bold">
-            {lawyer.lawyer_name || lawyer.lawyer_id}
+            {lawyer.lawyer_name || lawyer.lawyer_id} ({lawyer.lawyer_id})
           </h1>
           <div className="flex flex-wrap items-center gap-2 text-muted-foreground">
             <span>{lawyer.branch_name}</span>
