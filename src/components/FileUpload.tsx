@@ -46,7 +46,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     const formData = new FormData();
     formData.append('file', file);
 
-    console.log('Attempting Edge Function processing...');
+    console.log('Attempting optimized Edge Function processing...');
     
     const { data, error } = await supabase.functions.invoke('preprocess-csv', {
       body: formData,
@@ -61,45 +61,39 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
       throw new Error('Invalid response from Edge Function');
     }
 
-    console.log('Edge Function response sample:', data[0]);
+    console.log(`Edge Function processed ${data.length} records successfully`);
 
-    // Map the edge function response to our Lawyer type with proper expertise_domains handling
-    return data.map((row: any, index: number): Lawyer => {
-      // Ensure expertise_domains is properly preserved as a full string
-      const expertiseDomains = row.expertise_domains || row.domain;
-      console.log(`Lawyer ${index} expertise_domains from Edge Function:`, expertiseDomains);
-      
-      return {
-        lawyer_id: row.lawyer_id || `L${Date.now()}-${index}`,
-        lawyer_name: row.lawyer_name || undefined,
-        branch_name: row.branch_name || 'Corporate',
-        expertise_domains: expertiseDomains || undefined, // Preserve full string
-        allocation_month: row.allocation_month || new Date().toISOString().slice(0, 7),
-        case_id: row.case_id || `C${Date.now()}-${index}`,
-        cases_assigned: parseInt(row.cases_assigned) || 30,
-        cases_completed: parseInt(row.cases_completed) || 25,
-        completion_rate: parseFloat(row.completion_rate) || 0.8,
-        cases_remaining: parseInt(row.cases_remaining) || 5,
-        performance_score: parseFloat(row.performance_score) || 0.75,
-        tat_compliance_percent: parseFloat(row.tat_compliance_percent) || 0.8,
-        avg_tat_days: parseFloat(row.avg_tat_days) || 15,
-        tat_flag: (row.tat_flag as 'Red' | 'Green') || 'Green',
-        quality_check_flag: row.quality_check_flag === true || row.quality_check_flag === 'true',
-        client_feedback_score: parseFloat(row.client_feedback_score) || 4.0,
-        feedback_flag: row.feedback_flag === true || row.feedback_flag === 'true',
-        complaints_per_case: parseFloat(row.complaints_per_case) || 0.05,
-        reworks_per_case: parseFloat(row.reworks_per_case) || 0.1,
-        low_performance_flag: row.low_performance_flag === true || row.low_performance_flag === 'true',
-        lawyer_score: parseFloat(row.lawyer_score) || Math.random() * 0.4 + 0.6,
-        quality_rating: parseFloat(row.quality_rating) || 4.0,
-        allocation_status: (row.allocation_status as 'Allocated' | 'Available') || 'Available',
-        total_cases_ytd: parseInt(row.total_cases_ytd) || 100
-      };
-    });
+    // Fast mapping without extensive validation
+    return data.map((row: any, index: number): Lawyer => ({
+      lawyer_id: row.lawyer_id || `L${Date.now()}-${index}`,
+      lawyer_name: row.lawyer_name || undefined,
+      branch_name: row.branch_name || 'Corporate',
+      expertise_domains: row.expertise_domains || row.domain || undefined,
+      allocation_month: row.allocation_month || new Date().toISOString().slice(0, 7),
+      case_id: row.case_id || `C${Date.now()}-${index}`,
+      cases_assigned: parseInt(row.cases_assigned) || 30,
+      cases_completed: parseInt(row.cases_completed) || 25,
+      completion_rate: parseFloat(row.completion_rate) || 0.8,
+      cases_remaining: parseInt(row.cases_remaining) || 5,
+      performance_score: parseFloat(row.performance_score) || 0.75,
+      tat_compliance_percent: parseFloat(row.tat_compliance_percent) || 80,
+      avg_tat_days: parseFloat(row.avg_tat_days) || 15,
+      tat_flag: (row.tat_flag as 'Red' | 'Green') || 'Green',
+      quality_check_flag: row.quality_check_flag === true || row.quality_check_flag === 'true',
+      client_feedback_score: parseFloat(row.client_feedback_score) || 4.0,
+      feedback_flag: row.feedback_flag === true || row.feedback_flag === 'true',
+      complaints_per_case: parseFloat(row.complaints_per_case) || 0.05,
+      reworks_per_case: parseFloat(row.reworks_per_case) || 0.1,
+      low_performance_flag: row.low_performance_flag === true || row.low_performance_flag === 'true',
+      lawyer_score: parseFloat(row.lawyer_score) || Math.random() * 0.4 + 0.6,
+      quality_rating: parseFloat(row.quality_rating) || 4.0,
+      allocation_status: (row.allocation_status as 'Allocated' | 'Available') || 'Available',
+      total_cases_ytd: parseInt(row.total_cases_ytd) || 100
+    }));
   };
 
   const processWithClientSide = async (file: File): Promise<Lawyer[]> => {
-    console.log('Using client-side processing...');
+    console.log('Using fast client-side processing...');
     const csvContent = await file.text();
     const result = parseCSVContent(csvContent);
     
@@ -111,19 +105,36 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
   };
 
   const processFile = async (file: File): Promise<{ data: Lawyer[], method: 'edge-function' | 'client-side' }> => {
-    // Try Edge Function first, then fallback to client-side processing
-    try {
-      const data = await processWithEdgeFunction(file);
-      return { data, method: 'edge-function' };
-    } catch (edgeError) {
-      console.warn('Edge Function failed, falling back to client-side processing:', edgeError);
-      
+    // For faster processing, try client-side first for smaller files
+    if (file.size < 1024 * 1024) { // Less than 1MB, use client-side for speed
       try {
+        console.log('Small file detected, using fast client-side processing...');
         const data = await processWithClientSide(file);
         return { data, method: 'client-side' };
       } catch (clientError) {
-        console.error('Client-side processing also failed:', clientError);
-        throw new Error(`Processing failed: ${clientError instanceof Error ? clientError.message : 'Unknown error'}`);
+        console.warn('Client-side processing failed, trying Edge Function:', clientError);
+        try {
+          const data = await processWithEdgeFunction(file);
+          return { data, method: 'edge-function' };
+        } catch (edgeError) {
+          console.error('Both processing methods failed:', edgeError);
+          throw new Error(`Processing failed: ${edgeError instanceof Error ? edgeError.message : 'Unknown error'}`);
+        }
+      }
+    } else {
+      // For larger files, try Edge Function first
+      try {
+        const data = await processWithEdgeFunction(file);
+        return { data, method: 'edge-function' };
+      } catch (edgeError) {
+        console.warn('Edge Function failed, falling back to client-side processing:', edgeError);
+        try {
+          const data = await processWithClientSide(file);
+          return { data, method: 'client-side' };
+        } catch (clientError) {
+          console.error('Both processing methods failed:', clientError);
+          throw new Error(`Processing failed: ${clientError instanceof Error ? clientError.message : 'Unknown error'}`);
+        }
       }
     }
   };
@@ -135,18 +146,18 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     setError(null);
     
     try {
+      const startTime = performance.now();
       const { data, method } = await processFile(file);
-      console.log('Preview data sample with expertise domains:', data.slice(0, 3).map(d => ({ 
-        id: d.lawyer_id, 
-        name: d.lawyer_name, 
-        domains: d.expertise_domains 
-      })));
+      const endTime = performance.now();
+      
+      console.log(`Processing completed in ${(endTime - startTime).toFixed(2)}ms using ${method}`);
+      
       setPreview(data.slice(0, 5));
       setProcessingMethod(method);
       
       toast({
         title: "File processed successfully",
-        description: `Preview showing first ${Math.min(5, data.length)} rows from ${data.length} total records. Processed using ${method === 'edge-function' ? 'Supabase Edge Function' : 'client-side processing'}.`,
+        description: `Preview showing first ${Math.min(5, data.length)} rows from ${data.length} total records. Processed in ${(endTime - startTime).toFixed(0)}ms using ${method === 'edge-function' ? 'Edge Function' : 'optimized client-side processing'}.`,
       });
     } catch (error) {
       console.error('Preview error:', error);
@@ -169,12 +180,11 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     setError(null);
     
     try {
+      const startTime = performance.now();
       const { data, method } = await processFile(file);
-      console.log('Upload data sample with expertise domains:', data.slice(0, 3).map(d => ({ 
-        id: d.lawyer_id, 
-        name: d.lawyer_name, 
-        domains: d.expertise_domains 
-      })));
+      const endTime = performance.now();
+      
+      console.log(`Upload processing completed in ${(endTime - startTime).toFixed(2)}ms using ${method}`);
       setProcessingMethod(method);
       
       await addLawyersMutation.mutateAsync(data);
@@ -189,7 +199,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
       
       toast({
         title: "Upload successful",
-        description: `Successfully uploaded ${data.length} lawyer records using ${method === 'edge-function' ? 'Supabase Edge Function' : 'client-side processing'}.`,
+        description: `Successfully uploaded ${data.length} lawyer records in ${(endTime - startTime).toFixed(0)}ms using ${method === 'edge-function' ? 'Edge Function' : 'optimized processing'}.`,
       });
       
     } catch (error) {
@@ -210,7 +220,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold">Upload Lawyer Data</h1>
-        <p className="text-muted-foreground">Upload a CSV file with robust processing and automatic fallback</p>
+        <p className="text-muted-foreground">Upload a CSV file with optimized fast processing</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -218,7 +228,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
           <CardHeader>
             <CardTitle className="flex items-center">
               <Upload className="mr-2 h-5 w-5" />
-              File Upload & Processing
+              Fast File Upload & Processing
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -237,6 +247,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
               <Alert>
                 <AlertDescription>
                   Selected file: {file.name} ({(file.size / 1024).toFixed(1)} KB)
+                  {file.size < 1024 * 1024 && " - Will use fast client-side processing"}
                 </AlertDescription>
               </Alert>
             )}
@@ -251,7 +262,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
                 <AlertDescription>
                   {processingMethod === 'edge-function' 
                     ? 'Processed using Supabase Edge Function (server-side)' 
-                    : 'Processed using client-side fallback (Edge Function unavailable)'}
+                    : 'Processed using optimized client-side processing (faster for small files)'}
                 </AlertDescription>
               </Alert>
             )}
@@ -270,7 +281,7 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
                 variant="outline"
                 className="flex-1"
               >
-                {isProcessing ? 'Processing...' : 'Preview'}
+                {isProcessing ? 'Processing...' : 'Quick Preview'}
               </Button>
               
               <Button 
@@ -278,14 +289,14 @@ export function FileUpload({ onFileUpload }: FileUploadProps) {
                 disabled={!file || isProcessing || addLawyersMutation.isPending}
                 className="flex-1"
               >
-                {isProcessing || addLawyersMutation.isPending ? 'Uploading...' : 'Process & Upload'}
+                {isProcessing || addLawyersMutation.isPending ? 'Uploading...' : 'Fast Process & Upload'}
               </Button>
             </div>
 
             <div className="text-xs text-muted-foreground">
-              <p>• <strong>Dual Processing:</strong> Edge Function with client-side fallback</p>
-              <p>• <strong>Robust:</strong> Handles various CSV formats and missing data</p>
-              <p>• <strong>Reliable:</strong> Always works regardless of backend status</p>
+              <p>• <strong>Optimized Speed:</strong> Smart processing method selection</p>
+              <p>• <strong>Fast for Small Files:</strong> Client-side processing for files under 1MB</p>
+              <p>• <strong>Reliable Fallback:</strong> Edge Function for larger files</p>
             </div>
           </CardContent>
         </Card>
