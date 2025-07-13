@@ -1,3 +1,4 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
@@ -155,7 +156,7 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={400}>
-              <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+              <ComposedChart data={chartData} margin={{ top: 20, right: 40, left: 40, bottom: 60 }}>
                 <defs>
                   <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
@@ -178,13 +179,25 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
                 <YAxis 
                   yAxisId="left"
                   tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                  label={{ value: 'Performance Score (%)', angle: -90, position: 'insideLeft' }}
+                  label={{ 
+                    value: 'Performance Score (%)', 
+                    angle: -90, 
+                    position: 'insideLeft',
+                    style: { textAnchor: 'middle' },
+                    offset: 10
+                  }}
                 />
                 <YAxis 
                   yAxisId="right" 
                   orientation="right"
                   tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
-                  label={{ value: 'Completion Rate (%)', angle: 90, position: 'insideRight' }}
+                  label={{ 
+                    value: 'Completion Rate (%)', 
+                    angle: 90, 
+                    position: 'insideRight',
+                    style: { textAnchor: 'middle' },
+                    offset: 10
+                  }}
                 />
                 <Tooltip content={<CustomTooltip />} />
                 <Bar 
