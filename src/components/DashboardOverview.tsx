@@ -1,7 +1,8 @@
+
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, ComposedChart, Line, LineChart } from "recharts";
 import { Lawyer } from "@/types/lawyer";
 
 interface DashboardOverviewProps {
@@ -21,13 +22,15 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
   }, {} as Record<string, number>);
 
   const chartData = Object.entries(branchData).map(([branch, count]) => ({
-    branch,
+    branch: branch.length > 15 ? branch.substring(0, 15) + '...' : branch,
+    fullBranch: branch,
     count,
-    avgScore: lawyers.filter(l => l.branch_name === branch)
-      .reduce((sum, l) => sum + l.lawyer_score, 0) / count,
-    avgCompletionRate: lawyers.filter(l => l.branch_name === branch)
-      .reduce((sum, l) => sum + l.completion_rate, 0) / count
-  }));
+    avgScore: Math.round((lawyers.filter(l => l.branch_name === branch)
+      .reduce((sum, l) => sum + l.lawyer_score, 0) / count) * 100),
+    avgCompletionRate: Math.round((lawyers.filter(l => l.branch_name === branch)
+      .reduce((sum, l) => sum + l.completion_rate, 0) / count) * 100),
+    highPerformers: lawyers.filter(l => l.branch_name === branch && l.lawyer_score >= 0.8).length
+  })).sort((a, b) => b.avgScore - a.avgScore);
 
   const tatData = [
     { name: 'Green', value: lawyers.filter(l => l.tat_flag === 'Green').length, color: '#10b981' },
@@ -57,6 +60,34 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
         ))}
       </div>
     );
+  };
+
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-background border border-border rounded-lg p-3 shadow-lg">
+          <p className="font-semibold text-foreground mb-2">{data.fullBranch}</p>
+          <div className="space-y-1 text-sm">
+            <p className="text-muted-foreground">
+              <span className="inline-block w-3 h-3 rounded-full bg-gradient-to-r from-blue-500 to-purple-600 mr-2"></span>
+              Lawyer Score: <span className="font-medium text-foreground">{data.avgScore}%</span>
+            </p>
+            <p className="text-muted-foreground">
+              <span className="inline-block w-3 h-3 rounded-full bg-gradient-to-r from-green-500 to-emerald-500 mr-2"></span>
+              Completion Rate: <span className="font-medium text-foreground">{data.avgCompletionRate}%</span>
+            </p>
+            <p className="text-muted-foreground">
+              Total Lawyers: <span className="font-medium text-foreground">{data.count}</span>
+            </p>
+            <p className="text-muted-foreground">
+              High Performers: <span className="font-medium text-foreground">{data.highPerformers}</span>
+            </p>
+          </div>
+        </div>
+      );
+    }
+    return null;
   };
 
   return (
@@ -113,19 +144,69 @@ export function DashboardOverview({ lawyers }: DashboardOverviewProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Card>
+        <Card className="col-span-1 lg:col-span-2">
           <CardHeader>
-            <CardTitle>Performance by Branch</CardTitle>
+            <CardTitle className="flex items-center gap-2">
+              <div className="w-2 h-6 bg-gradient-to-b from-blue-500 to-purple-600 rounded-full"></div>
+              Performance by Branch
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Comprehensive branch performance analysis with lawyer scores and completion rates
+            </p>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="branch" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="avgScore" fill="#3b82f6" name="Avg Lawyer Score" />
-              </BarChart>
+            <ResponsiveContainer width="100%" height={400}>
+              <ComposedChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 60 }}>
+                <defs>
+                  <linearGradient id="scoreGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                    <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.6}/>
+                  </linearGradient>
+                  <linearGradient id="completionGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.8}/>
+                    <stop offset="100%" stopColor="#059669" stopOpacity={0.6}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" opacity={0.3} />
+                <XAxis 
+                  dataKey="branch" 
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  angle={-45}
+                  textAnchor="end"
+                  height={80}
+                  interval={0}
+                />
+                <YAxis 
+                  yAxisId="left"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  label={{ value: 'Performance Score (%)', angle: -90, position: 'insideLeft' }}
+                />
+                <YAxis 
+                  yAxisId="right" 
+                  orientation="right"
+                  tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }}
+                  label={{ value: 'Completion Rate (%)', angle: 90, position: 'insideRight' }}
+                />
+                <Tooltip content={<CustomTooltip />} />
+                <Bar 
+                  yAxisId="left"
+                  dataKey="avgScore" 
+                  fill="url(#scoreGradient)" 
+                  name="Avg Lawyer Score"
+                  radius={[4, 4, 0, 0]}
+                  stroke="hsl(var(--border))"
+                  strokeWidth={1}
+                />
+                <Line 
+                  yAxisId="right"
+                  type="monotone" 
+                  dataKey="avgCompletionRate" 
+                  stroke="url(#completionGradient)"
+                  strokeWidth={3}
+                  dot={{ fill: '#10b981', strokeWidth: 2, r: 4 }}
+                  activeDot={{ r: 6, stroke: '#10b981', strokeWidth: 2 }}
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
