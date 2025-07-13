@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Lawyer } from '@/types/lawyer';
@@ -155,6 +154,44 @@ export const useAddLawyers = () => {
       toast({
         title: "Error",
         description: "Failed to upload lawyers data. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const useClearLawyers = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: async () => {
+      console.log('Attempting to clear all lawyers');
+      
+      const { error } = await supabase
+        .from('lawyers')
+        .delete()
+        .neq('id', '00000000-0000-0000-0000-000000000000'); // Delete all records
+
+      if (error) {
+        console.error('Error clearing lawyers:', error);
+        throw error;
+      }
+
+      console.log('Successfully cleared all lawyers');
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['lawyers'] });
+      toast({
+        title: "Success",
+        description: "All lawyer data has been cleared successfully!",
+      });
+    },
+    onError: (error) => {
+      console.error('Clear mutation error:', error);
+      toast({
+        title: "Error",
+        description: "Failed to clear lawyer data. Please try again.",
         variant: "destructive",
       });
     },
