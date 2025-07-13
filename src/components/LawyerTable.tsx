@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +22,20 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
 
   const clearLawyersMutation = useClearLawyers();
 
+  // Reset search when lawyers array becomes empty
+  useEffect(() => {
+    if (lawyers.length === 0) {
+      setLocalSearch('');
+    }
+  }, [lawyers.length]);
+
+  // Reset confirmation state when mutation is successful
+  useEffect(() => {
+    if (clearLawyersMutation.isSuccess) {
+      setShowClearConfirm(false);
+    }
+  }, [clearLawyersMutation.isSuccess]);
+
   const handleSort = (field: keyof Lawyer) => {
     if (sortField === field) {
       setSortDirection(sortDirection === 'asc' ? 'desc' : 'asc');
@@ -33,7 +48,7 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
   const handleClearTable = () => {
     if (showClearConfirm) {
       clearLawyersMutation.mutate();
-      setShowClearConfirm(false);
+      // Don't reset showClearConfirm here - let the useEffect handle it
     } else {
       setShowClearConfirm(true);
       // Auto-hide confirmation after 3 seconds
@@ -88,7 +103,6 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
     );
   };
 
-  // Helper function to format lawyer name
   const formatLawyerName = (name: string | undefined) => {
     if (!name || name.trim() === '' || name === 'undefined') {
       return <span className="text-muted-foreground">Unknown Lawyer</span>;
@@ -130,7 +144,7 @@ export function LawyerTable({ lawyers, onLawyerSelect }: LawyerTableProps) {
         </div>
       </div>
 
-      {showClearConfirm && (
+      {showClearConfirm && !clearLawyersMutation.isPending && (
         <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
           <p className="text-destructive font-medium">
             Are you sure you want to clear all lawyer data? This action cannot be undone.
