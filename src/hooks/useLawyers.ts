@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Lawyer } from '@/types/lawyer';
@@ -181,7 +182,12 @@ export const useClearLawyers = () => {
       console.log('Successfully cleared all lawyers');
     },
     onSuccess: () => {
+      console.log('Clear mutation successful, invalidating queries');
+      // Invalidate and refetch the lawyers query
       queryClient.invalidateQueries({ queryKey: ['lawyers'] });
+      // Also set the query data to empty array immediately for instant UI update
+      queryClient.setQueryData(['lawyers'], []);
+      
       toast({
         title: "Success",
         description: "All lawyer data has been cleared successfully!",
