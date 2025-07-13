@@ -1,3 +1,4 @@
+
 import { ProcessedRow } from './csvFeatureEngineering';
 
 export function aggregateByLawyerId(processedRows: ProcessedRow[]): ProcessedRow[] {
@@ -50,7 +51,9 @@ export function aggregateByLawyerId(processedRows: ProcessedRow[]): ProcessedRow
       quality_check_flag_encoded: Math.round(mean(rows.map(r => r.quality_check_flag_encoded))), // mean -> int
       allocation_status_encoded: Math.round(mean(rows.map(r => r.allocation_status_encoded))), // mean -> int
       allocation_month_num: rows[0].allocation_month_num, // first
-      low_performance_flag: Math.max(...rows.map(r => r.low_performance_flag)) // max
+      low_performance_flag: Math.max(...rows.map(r => r.low_performance_flag)), // max
+      avg_client_feedback_score: mean(rows.map(r => r.avg_client_feedback_score)), // mean
+      lawyer_score: mean(rows.map(r => r.lawyer_score)) // mean
     };
     
     aggregated.push(aggregatedRow);
